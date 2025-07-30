@@ -1,7 +1,14 @@
 <script lang="ts">
 	import '../app.css';
+	import { Toaster } from 'svelte-sonner';
+	import { setContext } from 'svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
+	setContext('projectlist', data.projects);
 </script>
 
-{@render children()}
+<div class="h-screen w-screen p-6">
+	{@render children()}
+
+	<Toaster richColors />
+</div>
