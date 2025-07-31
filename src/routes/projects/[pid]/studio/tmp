@@ -1,0 +1,566 @@
+<script lang="ts">
+	/* ---------- imports ---------- */
+	import { getContext, onMount, onDestroy } from 'svelte';
+	import ProjectNav from '$lib/components/ProjectNav.svelte';
+	import { PUBLIC_API_BASE } from '$env/static/public';
+
+	/* UI */
+	import { Button } from '$lib/components/ui/button';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import { Select, SelectTrigger, SelectContent, SelectItem } from '$lib/components/ui/select';
+	import { ChevronDown, LoaderCircle } from '@lucide/svelte';
+	import {
+		Collapsible,
+		CollapsibleTrigger,
+		CollapsibleContent
+	} from '$lib/components/ui/collapsible';
+	import { toast } from 'svelte-sonner';
+
+	/* API types + calls */
+	import type {
+		MediaRead,
+		ProjectRead,
+		ImagePromptRead,
+		VideoPromptRead,
+		ImagePromptCreate,
+		ImageAnnotationRead,
+		LabelRead
+	} from '$lib/api/openapi/types.gen';
+	import {
+		listMediaApiV1ProjectsPidMediaGet as listMedia,
+		listLabelsApiV1ProjectsPidLabelsGet as listLabels,
+		listImagePromptsApiV1ProjectsPidPromptsImageGet as listImagePrompt,
+		listVideoPromptsApiV1ProjectsPidPromptsVideoGet as listVideoPrompt,
+		listModelsApiV1ModelsGet as listModels,
+		addImagePromptApiV1ProjectsPidPromptsImagePost as addImagePrompt,
+		deleteImagePromptApiV1ProjectsPidPromptsImageAidDelete as deleteImagePrompt,
+		getImageAnnotationApiV1ProjectsPidAnnotationsImageMidGet as getImageAnnotation
+	} from '$lib/api/openapi/sdk.gen';
+	import { client } from '$lib/api/client';
+
+	/* ---------- project context ---------- */
+	const project = /** @type {ProjectRead} */ (/** @ts-ignore */ getContext<ProjectRead>('project'));
+
+	/* ---------- reactive state ---------- */
+	let viewerEl: HTMLElement;
+	let eventStream: EventSource | undefined = $state();
+
+	let media: MediaRead[] = $state([]);
+	let annotated: MediaRead[] = $state([]);
+	let unannotated: MediaRead[] = $state([]);
+	let selected: MediaRead | undefined = $state();
+	let queued = $state(new Set<number>());
+
+	let showUnannotated = $state(true);
+	let showAnnotated = $state(true);
+
+	let labels: LabelRead[] = $state([]);
+	let selectedLabelId: number | undefined = $state();
+	const labelColors: Record<number, string> = {}; // label_id → colour
+	function colorFor(id: number) {
+		if (!labelColors[id]) labelColors[id] = `hsl(${Math.random() * 360},70%,50%)`;
+		return labelColors[id];
+	}
+
+	let models: string[] = $state([]);
+	let selectedModelId: string | undefined = $state();
+
+	let prompts: (ImagePromptRead | VideoPromptRead)[] = $state([]);
+	let annotations: ImageAnnotationRead[] = $state([]);
+
+	/* viewer / canvas */
+	let annCanvas: HTMLCanvasElement;
+	// @ts-expect-error SSR
+	let imgEl: HTMLImageElement = $state();
+	let imgW = 1,
+		imgH = 1;
+	let scale = 1,
+		offsetX = 0,
+		offsetY = 0;
+
+	/* ---------- load helpers ---------- */
+	const alphaSort = <T extends { path?: string; name?: string }>(arr: T[]) =>
+		[...arr].sort((a, b) => (a.path ?? a.name ?? '').localeCompare(b.path ?? b.name ?? ''));
+
+	async function refreshMedia() {
+		const { data } = await listMedia({ client, path: { pid: project.id } });
+		media = data ?? [];
+		annotated = alphaSort(media.filter((m) => (m as MediaRead).prompt_count > 0));
+		unannotated = alphaSort(media.filter((m) => (m as MediaRead).prompt_count === 0));
+		if (!selected && media.length) selectMedia(media[0]);
+	}
+	async function refreshLabels() {
+		const { data } = await listLabels({ client, path: { pid: project.id } });
+		labels = data ?? [];
+		if (!selectedLabelId && labels.length) selectedLabelId = labels[0].id;
+	}
+	async function refreshModels() {
+		const { data } = await listModels({ client });
+		models = data ?? [];
+		if (!selectedModelId && models.length) selectedModelId = models[0];
+	}
+	async function refreshPrompts() {
+		if (!selected) return;
+		if (selected.media_type === 'image') {
+			const { data } = await listImagePrompt({
+				client,
+				path: { pid: project.id },
+				query: { media_id: selected.id }
+			});
+			prompts = data ?? [];
+		} else {
+			const { data } = await listVideoPrompt({
+				client,
+				path: { pid: project.id },
+				query: { media_id: selected.id }
+			});
+			prompts = data ?? [];
+		}
+		drawOverlay();
+	}
+	async function refreshAnnotations() {
+		if (!selected || selected.media_type !== 'image') return;
+		const { data } = await getImageAnnotation({
+			client,
+			path: { pid: project.id, mid: selected.id }
+		});
+		annotations = data ?? [];
+		drawOverlay();
+	}
+
+	/* ---------- prompt ops ---------- */
+	function toImageCoords(e: MouseEvent) {
+		const mainRect = annCanvas.getBoundingClientRect();
+		const imgRect = imgEl.getBoundingClientRect();
+		const baseScale = imgRect.width / imgW;
+		const mx = e.clientX - mainRect.left,
+			my = e.clientY - mainRect.top;
+		const vx = mx - offsetX - (imgRect.left - mainRect.left);
+		const vy = my - offsetY - (imgRect.top - mainRect.top);
+		const x = Math.round(vx / (scale * baseScale));
+		const y = Math.round(vy / (scale * baseScale));
+		return [Math.max(0, Math.min(imgW - 1, x)), Math.max(0, Math.min(imgH - 1, y))];
+	}
+
+	async function addPrompt(x: number, y: number, positive = true) {
+		if (!selected || !selectedLabelId) return;
+		const body: ImagePromptCreate = {
+			media_id: selected.id,
+			label_id: selectedLabelId,
+			points: [[x, y]],
+			labels: [positive ? 1 : 0]
+		};
+		const res = await addImagePrompt({ client, path: { pid: project.id }, body });
+		if (res.response.ok && res.data?.detail === 'queued') queued.add(selected.id);
+		refreshPrompts();
+		refreshMedia();
+	}
+
+	async function deleteNearestPrompt(x: number, y: number) {
+		if (!prompts.length || !selected) return;
+		const idx = prompts.reduce((best, p, i) => {
+			const [ax, ay] = (p as any).points[0];
+			const [bx, by] = (prompts[best] as any).points[0];
+			return (ax - x) ** 2 + (ay - y) ** 2 < (bx - x) ** 2 + (by - y) ** 2 ? i : best;
+		}, 0);
+		const aid = (prompts[idx] as ImagePromptRead).id;
+		const res = await deleteImagePrompt({ client, path: { pid: project.id, aid } });
+		if (res.response.ok && res.data?.detail === 'queued') queued.add(selected.id);
+		refreshPrompts();
+		refreshMedia();
+	}
+
+	/* cycle label for a prompt */
+	function cycleLabel(p: ImagePromptRead) {
+		if (!labels.length) return;
+		const currentIdx = labels.findIndex((l) => l.id === p.label_id);
+		const next = labels[(currentIdx + 1) % labels.length];
+		p.label_id = next.id; // mutate locally for immediate feedback
+		drawOverlay(); // redraw points
+		// let backend recompute on next add / delete; a full support would PATCH prompt here
+	}
+
+	/* ---------- image / prompt drawing ---------- */
+	function drawPromptPoint(
+		ctx: CanvasRenderingContext2D,
+		x: number,
+		y: number,
+		pos: boolean,
+		label_id: number
+	) {
+		const worldR = 4; // radius in image px
+		const imgRect = imgEl.getBoundingClientRect();
+		const baseScale = imgRect.width / imgW;
+		const r = worldR / (scale * baseScale);
+
+		ctx.fillStyle = colorFor(label_id);
+		ctx.beginPath();
+		ctx.arc(x, y, r, 0, Math.PI * 2);
+		ctx.fill();
+
+		ctx.strokeStyle = '#fff';
+		ctx.lineWidth = 1.4 / r;
+		ctx.beginPath();
+		ctx.moveTo(x - r * 0.6, y);
+		ctx.lineTo(x + r * 0.6, y); // minus
+		if (pos) {
+			ctx.moveTo(x, y - r * 0.6);
+			ctx.lineTo(x, y + r * 0.6);
+		} // plus if positive
+		ctx.stroke();
+	}
+
+	function decodeRle(rle: string | null | undefined, w: number, h: number) {
+		if (!rle) return new Uint8Array(0);
+		const nums = rle.split(/[\s,]+/).map(Number);
+		const mask = new Uint8Array(w * h);
+		for (let i = 0; i < nums.length; i += 2) {
+			mask.fill(1, nums[i], nums[i] + nums[i + 1]);
+		}
+		return mask;
+	}
+
+	function drawMasks(ctx: CanvasRenderingContext2D) {
+		if (!annotations.length) return;
+		const imgData = ctx.createImageData(imgW, imgH);
+		const data = imgData.data;
+		annotations.forEach((a) => {
+			const m = decodeRle(a.mask_rle, imgW, imgH);
+			for (let i = 0; i < m.length; i++) {
+				if (m[i]) {
+					const k = i * 4;
+					data[k] = 0;
+					data[k + 1] = 255;
+					data[k + 2] = 0;
+					data[k + 3] = 80;
+				}
+			}
+		});
+		const tmp = document.createElement('canvas');
+		tmp.width = imgW;
+		tmp.height = imgH;
+		tmp.getContext('2d')!.putImageData(imgData, 0, 0);
+		ctx.drawImage(tmp, 0, 0);
+	}
+
+	function drawOverlay() {
+		const ctx = annCanvas?.getContext('2d');
+		if (!ctx || !selected || !imgEl) return;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		const dpr = window.devicePixelRatio || 1;
+		const dispW = viewerEl.clientWidth,
+			dispH = viewerEl.clientHeight;
+		annCanvas.style.width = `${dispW}px`;
+		annCanvas.style.height = `${dispH}px`;
+		annCanvas.width = dispW * dpr;
+		annCanvas.height = dispH * dpr;
+		ctx.scale(dpr, dpr);
+		ctx.clearRect(0, 0, dispW, dispH);
+
+		const mainRect = annCanvas.getBoundingClientRect();
+		const imgRect = imgEl.getBoundingClientRect();
+		const baseScale = imgRect.width / imgW;
+		ctx.translate(offsetX + (imgRect.left - mainRect.left), offsetY + (imgRect.top - mainRect.top));
+		ctx.scale(scale * baseScale, scale * baseScale);
+
+		drawMasks(ctx);
+		prompts.forEach((p) => {
+			const [x, y] = (p as any).points[0];
+			drawPromptPoint(ctx, x, y, (p as any).labels[0] === 1, (p as any).label_id);
+		});
+	}
+
+	/* ---------- selection / navigation ---------- */
+	function selectMedia(m: MediaRead) {
+		selected = m;
+		scale = 1;
+		offsetX = offsetY = 0;
+		refreshPrompts();
+		refreshAnnotations();
+	}
+	function indexIn(arr: MediaRead[], id?: number) {
+		return arr.findIndex((m) => m.id === id);
+	}
+	function prevImage() {
+		if (!media.length) return;
+		selectMedia(media[(indexIn(media, selected?.id) - 1 + media.length) % media.length]);
+	}
+	function nextImage() {
+		if (!media.length) return;
+		selectMedia(media[(indexIn(media, selected?.id) + 1) % media.length]);
+	}
+	function nextUnannotated() {
+		if (!unannotated.length) return;
+		selectMedia(unannotated[(indexIn(unannotated, selected?.id) + 1) % unannotated.length]);
+	}
+
+	/* ---------- keyboard shortcuts ---------- */
+	function handleKey(ev: KeyboardEvent) {
+		const n = +ev.key;
+		if (n >= 1 && n <= 9 && labels[n - 1]) {
+			selectedLabelId = labels[n - 1].id;
+			return;
+		}
+		if (ev.key === 'ArrowRight') {
+			nextImage();
+			return;
+		}
+		if (ev.key === 'ArrowLeft') {
+			prevImage();
+			return;
+		}
+		if (ev.key.toLowerCase() === 'u') {
+			nextUnannotated();
+			return;
+		}
+	}
+
+	/* ---------- image load ---------- */
+	function handleImgLoad() {
+		imgW = imgEl?.naturalWidth;
+		imgH = imgEl?.naturalHeight;
+		drawOverlay();
+	}
+
+	/* ---------- SSE ---------- */
+	function getEventStream() {
+		const es = new EventSource(`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/events`);
+		es.onmessage = (evt) => {
+			const msg = JSON.parse(evt.data);
+			if (msg.event === 'annotations_updated') {
+				queued.delete(msg.media_id);
+				if (selected?.id === msg.media_id) {
+					refreshPrompts();
+					refreshAnnotations();
+				}
+				refreshMedia();
+			}
+		};
+		return es;
+	}
+
+	/* ---------- lifecycle ---------- */
+	onMount(() => {
+		refreshMedia();
+		refreshLabels();
+		refreshModels();
+		eventStream = getEventStream();
+	});
+	onDestroy(() => eventStream?.close());
+</script>
+
+<svelte:window on:keydown={handleKey} />
+
+<!-- ------------- NAV ------------- -->
+<div class="mb-6">
+	<ProjectNav
+		content={[
+			{ name: 'Projects', href: '/' },
+			{ name: project.name, href: `/projects/${project.id}` },
+			[
+				{ name: 'Gallery', href: `/projects/${project.id}/gallery` },
+				{ name: 'Studio', href: `/projects/${project.id}/studio`, active: true },
+				{ name: 'Labels', href: `/projects/${project.id}/labels` }
+			]
+		]}
+	/>
+</div>
+
+<!-- ------------- LAYOUT ------------- -->
+<div class="flex h-[calc(100vh-7rem)] w-full gap-2 select-none">
+	<!-- LEFT SIDEBAR -->
+	<aside class="w-[270px] shrink-0 rounded-lg border bg-background p-2">
+		<ScrollArea class="h-full pr-1">
+			<!-- Unannotated -->
+			<Collapsible bind:open={showUnannotated}>
+				<CollapsibleTrigger>
+					<Button variant="ghost" class="mb-1 w-full justify-between">
+						<span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+							>Unannotated</span
+						>
+						<span class="ml-2 text-muted-foreground">{unannotated.length}</span>
+						<ChevronDown
+							class="h-4 w-4 transition-transform {showUnannotated ? 'rotate-180' : ''}"
+						/>
+					</Button>
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<ul class="space-y-1">
+						{#each unannotated as item}
+							<li>
+								<Button
+									variant={selected?.id === item.id ? 'secondary' : 'ghost'}
+									class="w-full justify-start"
+									onclick={() => selectMedia(item)}
+								>
+									{item.path.split('/').pop()}
+									{#if queued.has(item.id)}<LoaderCircle class="ml-2 h-4 w-4 animate-spin" />
+									{/if}
+								</Button>
+							</li>
+						{/each}
+					</ul>
+				</CollapsibleContent>
+			</Collapsible>
+
+			<!-- Annotated -->
+			<Collapsible bind:open={showAnnotated} class="mt-4">
+				<CollapsibleTrigger>
+					<Button variant="ghost" class="mb-1 w-full justify-between">
+						<span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+							>Annotated</span
+						>
+						<span class="ml-2 text-muted-foreground">{annotated.length}</span>
+						<ChevronDown class="h-4 w-4 transition-transform {showAnnotated ? 'rotate-180' : ''}" />
+					</Button>
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<ul class="space-y-1">
+						{#each annotated as item}
+							<li>
+								<Button
+									variant={selected?.id === item.id ? 'secondary' : 'ghost'}
+									class="w-full justify-start"
+									onclick={() => selectMedia(item)}
+								>
+									{item.path.split('/').pop()}
+									{#if queued.has(item.id)}<LoaderCircle class="ml-2 h-4 w-4 animate-spin" />
+									{/if}
+								</Button>
+							</li>
+						{/each}
+					</ul>
+				</CollapsibleContent>
+			</Collapsible>
+		</ScrollArea>
+	</aside>
+
+	<!-- CENTER VIEWER -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<main
+		bind:this={viewerEl}
+		class="relative flex-1 rounded-lg bg-black"
+		oncontextmenu={(e) => e.preventDefault()}
+		onclick={(e) => {
+			if (!selected) return;
+			const [ix, iy] = toImageCoords(e);
+			if (e.ctrlKey || e.metaKey) addPrompt(ix, iy, false);
+			else if (e.button === 0) addPrompt(ix, iy, true);
+		}}
+		onauxclick={(e) => {
+			if (!selected) return;
+			const [ix, iy] = toImageCoords(e);
+			if (e.button === 2) {
+				if (e.shiftKey) deleteNearestPrompt(ix, iy);
+				else {
+					const p = prompts.find((pr) => {
+						const [px, py] = (pr as any).points[0];
+						return Math.abs(px - ix) <= 3 && Math.abs(py - iy) <= 3;
+					}) as ImagePromptRead | undefined;
+					if (p) cycleLabel(p);
+				}
+			}
+		}}
+	>
+		{#if selected}
+			<!-- file name + queue spinner -->
+			{#if selected.path}
+				<div
+					class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 text-lg text-white"
+				>
+					{selected.path.split('/').pop()}
+					{#if queued.has(selected.id)}<LoaderCircle class="ml-2 inline h-4 w-4 animate-spin" />
+					{/if}
+				</div>
+			{/if}
+
+			{#if selected.media_type === 'image'}
+				<img
+					bind:this={imgEl}
+					onload={handleImgLoad}
+					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}`}
+					alt={selected.path}
+					draggable="false"
+					class="absolute inset-0 m-auto max-h-full max-w-full object-contain"
+				/>
+			{:else}
+				<video
+					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}`}
+					controls
+					class="absolute inset-0 m-auto max-h-full max-w-full object-contain"
+				>
+					<track kind="captions" />
+				</video>
+			{/if}
+		{/if}
+
+		<canvas bind:this={annCanvas} class="pointer-events-none absolute inset-0"></canvas>
+	</main>
+
+	<!-- RIGHT TOOLBAR -->
+	<aside class="flex w-[270px] shrink-0 flex-col rounded-lg border bg-background p-2">
+		<!-- nav buttons -->
+		<div class="mb-4 flex items-center justify-between gap-1">
+			<Button size="sm" variant="ghost" title="Previous (←)" onclick={prevImage}>(←) Prev</Button>
+			<Button size="sm" variant="ghost" title="Next (→)" onclick={nextImage}>Next (→)</Button>
+			<Button size="sm" variant="outline" title="Next unannotated (U)" onclick={nextUnannotated}
+				>Next (U)</Button
+			>
+		</div>
+
+		<!-- LABEL picker -->
+		<div class="mb-4">
+			<span class="mb-1 block text-sm font-medium">Labels</span>
+			<ScrollArea class="h-40 pr-1">
+				<ul class="space-y-1">
+					{#each labels as l, i}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+						<li
+							class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/60"
+							onclick={() => (selectedLabelId = l.id)}
+							oncontextmenu={() => (selectedLabelId = l.id)}
+						>
+							<div class="h-4 w-4 rounded-full" style="background:{colorFor(l.id)}"></div>
+							<span class={selectedLabelId === l.id ? 'font-semibold' : ''}>
+								{i < 9 ? `[${i + 1}] ` : ''}{l.name}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</ScrollArea>
+		</div>
+
+		<!-- model picker -->
+		<div class="mb-4">
+			<span class="mb-1 block text-sm font-medium">Model</span>
+			<Select type="single" bind:value={selectedModelId}>
+				<SelectTrigger class="w-full" placeholder="Select a model">{selectedModelId}</SelectTrigger>
+				<SelectContent>
+					{#each models as m}<SelectItem value={m}>{m}</SelectItem>{/each}
+				</SelectContent>
+			</Select>
+		</div>
+
+		<!-- prompt list -->
+		<div class="flex min-h-0 flex-1 flex-col">
+			<div class="mb-2 text-sm font-medium">Prompts ({prompts.length})</div>
+			<ScrollArea class="flex-1 overflow-y-auto pr-1">
+				<ul class="space-y-1 text-xs">
+					{#each prompts as p}
+						<li class="flex items-center gap-2 rounded bg-muted/60 px-2 py-1">
+							<div
+								class="h-3 w-3 rounded-full"
+								style="background:{colorFor((p as any).label_id)}"
+							></div>
+							<span class="truncate">
+								{(p as any).labels[0] === 1 ? '+' : '-'} • {(p as any).points[0].join(',')}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</ScrollArea>
+		</div>
+	</aside>
+</div>

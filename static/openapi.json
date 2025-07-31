@@ -204,6 +204,49 @@
                 }
             }
         },
+        "/api/v1/projects/{pid}/events": {
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "projects"
+                ],
+                "summary": "Project Events",
+                "description": "One SSE stream per project.\nYields JSON payloads (see top-of-file docstring).",
+                "operationId": "project_events_api_v1_projects__pid__events_get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/projects/{pid}/media": {
             "post": {
                 "tags": [
@@ -390,99 +433,26 @@
                 }
             }
         },
-        "/api/v1/projects/{pid}/models": {
-            "post": {
-                "tags": [
-                    "api",
-                    "v1",
-                    "models"
-                ],
-                "summary": "Add",
-                "operationId": "add_api_v1_projects__pid__models_post",
-                "parameters": [
-                    {
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Pid"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ModelCreate"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ModelRead"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
+        "/api/v1/models": {
             "get": {
                 "tags": [
                     "api",
                     "v1",
                     "models"
                 ],
-                "summary": "List ",
-                "operationId": "list__api_v1_projects__pid__models_get",
-                "parameters": [
-                    {
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Pid"
-                        }
-                    }
-                ],
+                "summary": "List Models",
+                "operationId": "list_models_api_v1_models_get",
                 "responses": {
                     "200": {
                         "description": "Successful Response",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/ModelRead"
+                                        "type": "string"
                                     },
-                                    "title": "Response List  Api V1 Projects  Pid  Models Get"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                    "type": "array",
+                                    "title": "Response List Models Api V1 Models Get"
                                 }
                             }
                         }
@@ -490,180 +460,15 @@
                 }
             }
         },
-        "/api/v1/projects/{pid}/models/{mid}": {
-            "patch": {
-                "tags": [
-                    "api",
-                    "v1",
-                    "models"
-                ],
-                "summary": "Patch",
-                "operationId": "patch_api_v1_projects__pid__models__mid__patch",
-                "parameters": [
-                    {
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Pid"
-                        }
-                    },
-                    {
-                        "name": "mid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Mid"
-                        }
-                    },
-                    {
-                        "name": "compiled",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "anyOf": [
-                                {
-                                    "type": "boolean"
-                                },
-                                {
-                                    "type": "null"
-                                }
-                            ],
-                            "title": "Compiled"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ModelRead"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "api",
-                    "v1",
-                    "models"
-                ],
-                "summary": "Remove",
-                "operationId": "remove_api_v1_projects__pid__models__mid__delete",
-                "parameters": [
-                    {
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Pid"
-                        }
-                    },
-                    {
-                        "name": "mid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Mid"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Successful Response"
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/projects/{pid}/annotations/image": {
-            "post": {
-                "tags": [
-                    "api",
-                    "v1",
-                    "annotations"
-                ],
-                "summary": "Add Image Annotation",
-                "operationId": "add_image_annotation_api_v1_projects__pid__annotations_image_post",
-                "parameters": [
-                    {
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Pid"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ImageAnnotationCreate"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ImageAnnotationRead"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
+        "/api/v1/projects/{pid}/prompts/image": {
             "get": {
                 "tags": [
                     "api",
                     "v1",
-                    "annotations"
+                    "prompts"
                 ],
-                "summary": "List Image Annotations",
-                "operationId": "list_image_annotations_api_v1_projects__pid__annotations_image_get",
+                "summary": "List Image Prompts",
+                "operationId": "list_image_prompts_api_v1_projects__pid__prompts_image_get",
                 "parameters": [
                     {
                         "name": "pid",
@@ -701,9 +506,78 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/ImageAnnotationRead"
+                                        "$ref": "#/components/schemas/ImagePromptRead"
                                     },
-                                    "title": "Response List Image Annotations Api V1 Projects  Pid  Annotations Image Get"
+                                    "title": "Response List Image Prompts Api V1 Projects  Pid  Prompts Image Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "prompts"
+                ],
+                "summary": "Add Image Prompt",
+                "operationId": "add_image_prompt_api_v1_projects__pid__prompts_image_post",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    },
+                    {
+                        "name": "model_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "default": "sam2.1_hiera_base+",
+                            "title": "Model Key"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImagePromptCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueueMsg"
                                 }
                             }
                         }
@@ -721,15 +595,15 @@
                 }
             }
         },
-        "/api/v1/projects/{pid}/annotations/image/{aid}": {
+        "/api/v1/projects/{pid}/prompts/image/{aid}": {
             "delete": {
                 "tags": [
                     "api",
                     "v1",
-                    "annotations"
+                    "prompts"
                 ],
-                "summary": "Delete Image Annotation",
-                "operationId": "delete_image_annotation_api_v1_projects__pid__annotations_image__aid__delete",
+                "summary": "Delete Image Prompt",
+                "operationId": "delete_image_prompt_api_v1_projects__pid__prompts_image__aid__delete",
                 "parameters": [
                     {
                         "name": "pid",
@@ -748,11 +622,35 @@
                             "type": "integer",
                             "title": "Aid"
                         }
+                    },
+                    {
+                        "name": "model_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "default": "sam2.1_hiera_base+",
+                            "title": "Model Key"
+                        }
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Successful Response"
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueueMsg"
+                                }
+                            }
+                        }
                     },
                     "422": {
                         "description": "Validation Error",
@@ -767,67 +665,15 @@
                 }
             }
         },
-        "/api/v1/projects/{pid}/annotations/video": {
-            "post": {
-                "tags": [
-                    "api",
-                    "v1",
-                    "annotations"
-                ],
-                "summary": "Add Video Annotation",
-                "operationId": "add_video_annotation_api_v1_projects__pid__annotations_video_post",
-                "parameters": [
-                    {
-                        "name": "pid",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "title": "Pid"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/VideoAnnotationCreate"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/VideoAnnotationRead"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
+        "/api/v1/projects/{pid}/prompts/video": {
             "get": {
                 "tags": [
                     "api",
                     "v1",
-                    "annotations"
+                    "prompts"
                 ],
-                "summary": "List Video Annotations",
-                "operationId": "list_video_annotations_api_v1_projects__pid__annotations_video_get",
+                "summary": "List Video Prompts",
+                "operationId": "list_video_prompts_api_v1_projects__pid__prompts_video_get",
                 "parameters": [
                     {
                         "name": "pid",
@@ -895,9 +741,61 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/VideoAnnotationRead"
+                                        "$ref": "#/components/schemas/VideoPromptRead"
                                     },
-                                    "title": "Response List Video Annotations Api V1 Projects  Pid  Annotations Video Get"
+                                    "title": "Response List Video Prompts Api V1 Projects  Pid  Prompts Video Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "prompts"
+                ],
+                "summary": "Add Video Prompt",
+                "operationId": "add_video_prompt_api_v1_projects__pid__prompts_video_post",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VideoPromptCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueueMsg"
                                 }
                             }
                         }
@@ -915,15 +813,15 @@
                 }
             }
         },
-        "/api/v1/projects/{pid}/annotations/video/{aid}": {
+        "/api/v1/projects/{pid}/prompts/video/{aid}": {
             "delete": {
                 "tags": [
                     "api",
                     "v1",
-                    "annotations"
+                    "prompts"
                 ],
-                "summary": "Delete Video Annotation",
-                "operationId": "delete_video_annotation_api_v1_projects__pid__annotations_video__aid__delete",
+                "summary": "Delete Video Prompt",
+                "operationId": "delete_video_prompt_api_v1_projects__pid__prompts_video__aid__delete",
                 "parameters": [
                     {
                         "name": "pid",
@@ -945,8 +843,506 @@
                     }
                 ],
                 "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueueMsg"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/annotations/image/": {
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "annotations"
+                ],
+                "summary": "List Image Annotations",
+                "operationId": "list_image_annotations_api_v1_projects__pid__annotations_image__get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ImageAnnotationRead"
+                                    },
+                                    "title": "Response List Image Annotations Api V1 Projects  Pid  Annotations Image  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/annotations/image/{mid}": {
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "annotations"
+                ],
+                "summary": "Get Image Annotation",
+                "operationId": "get_image_annotation_api_v1_projects__pid__annotations_image__mid__get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    },
+                    {
+                        "name": "mid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Mid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ImageAnnotationRead"
+                                    },
+                                    "title": "Response Get Image Annotation Api V1 Projects  Pid  Annotations Image  Mid  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/annotations/video/": {
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "annotations"
+                ],
+                "summary": "List Video Annotations",
+                "operationId": "list_video_annotations_api_v1_projects__pid__annotations_video__get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/VideoAnnotationRead"
+                                    },
+                                    "title": "Response List Video Annotations Api V1 Projects  Pid  Annotations Video  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/annotations/video/{mid}": {
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "annotations"
+                ],
+                "summary": "Get Video Annotation",
+                "operationId": "get_video_annotation_api_v1_projects__pid__annotations_video__mid__get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    },
+                    {
+                        "name": "mid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Mid"
+                        }
+                    },
+                    {
+                        "name": "frame_idx",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Frame Idx"
+                        }
+                    },
+                    {
+                        "name": "obj_idx",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Obj Idx"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/VideoAnnotationRead"
+                                    },
+                                    "title": "Response Get Video Annotation Api V1 Projects  Pid  Annotations Video  Mid  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/labels": {
+            "post": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "labels"
+                ],
+                "summary": "Create Label",
+                "operationId": "create_label_api_v1_projects__pid__labels_post",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LabelCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LabelRead"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "labels"
+                ],
+                "summary": "List Labels",
+                "operationId": "list_labels_api_v1_projects__pid__labels_get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/LabelRead"
+                                    },
+                                    "title": "Response List Labels Api V1 Projects  Pid  Labels Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/labels/{lid}": {
+            "patch": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "labels"
+                ],
+                "summary": "Update Label",
+                "operationId": "update_label_api_v1_projects__pid__labels__lid__patch",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    },
+                    {
+                        "name": "lid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Lid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LabelUpdate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LabelRead"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "labels"
+                ],
+                "summary": "Delete Label",
+                "operationId": "delete_label_api_v1_projects__pid__labels__lid__delete",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    },
+                    {
+                        "name": "lid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Lid"
+                        }
+                    }
+                ],
+                "responses": {
                     "204": {
                         "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{pid}/export": {
+            "get": {
+                "tags": [
+                    "api",
+                    "v1",
+                    "export"
+                ],
+                "summary": "Export Project",
+                "operationId": "export_project_api_v1_projects__pid__export_get",
+                "parameters": [
+                    {
+                        "name": "pid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Pid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
                     },
                     "422": {
                         "description": "Validation Error",
@@ -991,74 +1387,227 @@
                 "type": "object",
                 "title": "HTTPValidationError"
             },
-            "ImageAnnotationCreate": {
+            "ImageAnnotationRead": {
                 "properties": {
-                    "points": {
-                        "items": {
-                            "items": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "prompt_id": {
+                        "type": "integer",
+                        "title": "Prompt Id"
+                    },
+                    "project_id": {
+                        "anyOf": [
+                            {
                                 "type": "integer"
                             },
-                            "type": "array"
-                        },
-                        "type": "array",
-                        "title": "Points"
-                    },
-                    "labels": {
-                        "items": {
-                            "type": "integer"
-                        },
-                        "type": "array",
-                        "title": "Labels"
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Project Id"
                     },
                     "media_id": {
                         "type": "integer",
                         "title": "Media Id"
+                    },
+                    "label_id": {
+                        "type": "integer",
+                        "title": "Label Id"
+                    },
+                    "model_id": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ModelKeys"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "mask_rle": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Mask Rle"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "points",
-                    "labels",
-                    "media_id"
+                    "id",
+                    "prompt_id",
+                    "project_id",
+                    "media_id",
+                    "label_id",
+                    "model_id",
+                    "mask_rle"
                 ],
-                "title": "ImageAnnotationCreate"
+                "title": "ImageAnnotationRead"
             },
-            "ImageAnnotationRead": {
+            "ImagePromptCreate": {
                 "properties": {
-                    "points": {
-                        "items": {
-                            "items": {
-                                "type": "integer"
-                            },
-                            "type": "array"
-                        },
-                        "type": "array",
-                        "title": "Points"
-                    },
-                    "labels": {
-                        "items": {
-                            "type": "integer"
-                        },
-                        "type": "array",
-                        "title": "Labels"
-                    },
                     "media_id": {
                         "type": "integer",
                         "title": "Media Id"
+                    },
+                    "label_id": {
+                        "type": "integer",
+                        "title": "Label Id"
+                    },
+                    "x": {
+                        "type": "integer",
+                        "title": "X"
+                    },
+                    "y": {
+                        "type": "integer",
+                        "title": "Y"
+                    },
+                    "click_label": {
+                        "type": "integer",
+                        "title": "Click Label"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "media_id",
+                    "label_id",
+                    "x",
+                    "y",
+                    "click_label"
+                ],
+                "title": "ImagePromptCreate"
+            },
+            "ImagePromptRead": {
+                "properties": {
+                    "media_id": {
+                        "type": "integer",
+                        "title": "Media Id"
+                    },
+                    "label_id": {
+                        "type": "integer",
+                        "title": "Label Id"
+                    },
+                    "x": {
+                        "type": "integer",
+                        "title": "X"
+                    },
+                    "y": {
+                        "type": "integer",
+                        "title": "Y"
+                    },
+                    "click_label": {
+                        "type": "integer",
+                        "title": "Click Label"
                     },
                     "id": {
                         "type": "integer",
                         "title": "Id"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "title": "Project Id"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "points",
-                    "labels",
                     "media_id",
-                    "id"
+                    "label_id",
+                    "x",
+                    "y",
+                    "click_label",
+                    "id",
+                    "project_id"
                 ],
-                "title": "ImageAnnotationRead"
+                "title": "ImagePromptRead"
+            },
+            "LabelCreate": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "color": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^#?([a-fA-F0-9]{6}|[a-fA-F0-9]{3})$"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Color",
+                        "description": "Hex colour code, with or without leading #"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "LabelCreate"
+            },
+            "LabelRead": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Name"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "title": "Project Id"
+                    },
+                    "color": {
+                        "type": "string",
+                        "title": "Color"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name",
+                    "id",
+                    "project_id",
+                    "color"
+                ],
+                "title": "LabelRead"
+            },
+            "LabelUpdate": {
+                "properties": {
+                    "name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Name"
+                    },
+                    "color": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^#?([a-fA-F0-9]{6}|[a-fA-F0-9]{3})$"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Color"
+                    }
+                },
+                "type": "object",
+                "title": "LabelUpdate"
             },
             "MediaRead": {
                 "properties": {
@@ -1096,6 +1645,10 @@
                             }
                         ],
                         "title": "Fps"
+                    },
+                    "prompt_count": {
+                        "type": "integer",
+                        "title": "Prompt Count"
                     }
                 },
                 "type": "object",
@@ -1104,80 +1657,20 @@
                     "path",
                     "media_type",
                     "height",
-                    "width"
+                    "width",
+                    "prompt_count"
                 ],
                 "title": "MediaRead"
             },
-            "ModelCreate": {
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "title": "Name"
-                    },
-                    "engine": {
-                        "type": "string",
-                        "enum": [
-                            "torch",
-                            "tensorrt"
-                        ],
-                        "title": "Engine",
-                        "default": "torch"
-                    },
-                    "compiled": {
-                        "type": "boolean",
-                        "title": "Compiled",
-                        "default": false
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "name"
+            "ModelKeys": {
+                "type": "string",
+                "enum": [
+                    "sam2.1_hiera_tiny",
+                    "sam2.1_hiera_small",
+                    "sam2.1_hiera_base+",
+                    "sam2.1_hiera_large"
                 ],
-                "title": "ModelCreate"
-            },
-            "ModelRead": {
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "title": "Name"
-                    },
-                    "engine": {
-                        "type": "string",
-                        "enum": [
-                            "torch",
-                            "tensorrt"
-                        ],
-                        "title": "Engine",
-                        "default": "torch"
-                    },
-                    "compiled": {
-                        "type": "boolean",
-                        "title": "Compiled",
-                        "default": false
-                    },
-                    "id": {
-                        "type": "integer",
-                        "title": "Id"
-                    },
-                    "path": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Path"
-                    }
-                },
-                "type": "object",
-                "required": [
-                    "name",
-                    "id",
-                    "path"
-                ],
-                "title": "ModelRead"
+                "title": "ModelKeys"
             },
             "ProjectCreate": {
                 "properties": {
@@ -1220,22 +1713,15 @@
                         "title": "Id"
                     },
                     "default_model_id": {
-                        "anyOf": [
-                            {
-                                "type": "integer"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Default Model Id"
+                        "$ref": "#/components/schemas/ModelKeys"
                     }
                 },
                 "type": "object",
                 "required": [
                     "name",
                     "media_type",
-                    "id"
+                    "id",
+                    "default_model_id"
                 ],
                 "title": "ProjectRead"
             },
@@ -1253,19 +1739,25 @@
                         "title": "Name"
                     },
                     "default_model_id": {
-                        "anyOf": [
-                            {
-                                "type": "integer"
-                            },
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "title": "Default Model Id"
+                        "$ref": "#/components/schemas/ModelKeys"
                     }
                 },
                 "type": "object",
+                "required": [
+                    "default_model_id"
+                ],
                 "title": "ProjectUpdate"
+            },
+            "QueueMsg": {
+                "properties": {
+                    "detail": {
+                        "type": "string",
+                        "title": "Detail",
+                        "default": "queued"
+                    }
+                },
+                "type": "object",
+                "title": "QueueMsg"
             },
             "ValidationError": {
                 "properties": {
@@ -1300,24 +1792,26 @@
                 ],
                 "title": "ValidationError"
             },
-            "VideoAnnotationCreate": {
+            "VideoAnnotationRead": {
                 "properties": {
-                    "points": {
-                        "items": {
-                            "items": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "prompt_id": {
+                        "type": "integer",
+                        "title": "Prompt Id"
+                    },
+                    "project_id": {
+                        "anyOf": [
+                            {
                                 "type": "integer"
                             },
-                            "type": "array"
-                        },
-                        "type": "array",
-                        "title": "Points"
-                    },
-                    "labels": {
-                        "items": {
-                            "type": "integer"
-                        },
-                        "type": "array",
-                        "title": "Labels"
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Project Id"
                     },
                     "media_id": {
                         "type": "integer",
@@ -1330,40 +1824,51 @@
                     "obj_idx": {
                         "type": "integer",
                         "title": "Obj Idx"
+                    },
+                    "model_id": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ModelKeys"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "mask_rle": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Mask Rle"
                     }
                 },
                 "type": "object",
                 "required": [
-                    "points",
-                    "labels",
+                    "id",
+                    "prompt_id",
+                    "project_id",
                     "media_id",
                     "frame_idx",
-                    "obj_idx"
+                    "obj_idx",
+                    "model_id",
+                    "mask_rle"
                 ],
-                "title": "VideoAnnotationCreate"
+                "title": "VideoAnnotationRead"
             },
-            "VideoAnnotationRead": {
+            "VideoPromptCreate": {
                 "properties": {
-                    "points": {
-                        "items": {
-                            "items": {
-                                "type": "integer"
-                            },
-                            "type": "array"
-                        },
-                        "type": "array",
-                        "title": "Points"
-                    },
-                    "labels": {
-                        "items": {
-                            "type": "integer"
-                        },
-                        "type": "array",
-                        "title": "Labels"
-                    },
                     "media_id": {
                         "type": "integer",
                         "title": "Media Id"
+                    },
+                    "label_id": {
+                        "type": "integer",
+                        "title": "Label Id"
                     },
                     "frame_idx": {
                         "type": "integer",
@@ -1372,6 +1877,61 @@
                     "obj_idx": {
                         "type": "integer",
                         "title": "Obj Idx"
+                    },
+                    "x": {
+                        "type": "integer",
+                        "title": "X"
+                    },
+                    "y": {
+                        "type": "integer",
+                        "title": "Y"
+                    },
+                    "click_label": {
+                        "type": "integer",
+                        "title": "Click Label"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "media_id",
+                    "label_id",
+                    "frame_idx",
+                    "obj_idx",
+                    "x",
+                    "y",
+                    "click_label"
+                ],
+                "title": "VideoPromptCreate"
+            },
+            "VideoPromptRead": {
+                "properties": {
+                    "media_id": {
+                        "type": "integer",
+                        "title": "Media Id"
+                    },
+                    "label_id": {
+                        "type": "integer",
+                        "title": "Label Id"
+                    },
+                    "frame_idx": {
+                        "type": "integer",
+                        "title": "Frame Idx"
+                    },
+                    "obj_idx": {
+                        "type": "integer",
+                        "title": "Obj Idx"
+                    },
+                    "x": {
+                        "type": "integer",
+                        "title": "X"
+                    },
+                    "y": {
+                        "type": "integer",
+                        "title": "Y"
+                    },
+                    "click_label": {
+                        "type": "integer",
+                        "title": "Click Label"
                     },
                     "id": {
                         "type": "integer",
@@ -1380,14 +1940,16 @@
                 },
                 "type": "object",
                 "required": [
-                    "points",
-                    "labels",
                     "media_id",
+                    "label_id",
                     "frame_idx",
                     "obj_idx",
+                    "x",
+                    "y",
+                    "click_label",
                     "id"
                 ],
-                "title": "VideoAnnotationRead"
+                "title": "VideoPromptRead"
             }
         }
     }

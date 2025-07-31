@@ -15,8 +15,7 @@
 		VideoPromptRead,
 		ImagePromptCreate,
 		VideoPromptCreate,
-		ImageAnnotationRead,
-		LabelRead
+		ImageAnnotationRead
 	} from '$lib/api/openapi/types.gen';
 	import {
 		listMediaApiV1ProjectsPidMediaGet as listMedia,
@@ -25,8 +24,7 @@
 		listModelsApiV1ModelsGet as listModels,
 		addImagePromptApiV1ProjectsPidPromptsImagePost as addImagePrompt,
 		deleteImagePromptApiV1ProjectsPidPromptsImageAidDelete as deleteImagePrompt,
-		getImageAnnotationApiV1ProjectsPidAnnotationsImageMidGet as getImageAnnotation,
-		listLabelsApiV1ProjectsPidLabelsGet as listLabels
+		getImageAnnotationApiV1ProjectsPidAnnotationsImageMidGet as getImageAnnotation
 	} from '$lib/api/openapi/sdk.gen';
 	import { client } from '$lib/api/client';
 	import {
@@ -55,9 +53,6 @@
 	let models: string[] = $state([]);
 	let selectedModelId: string | undefined = $state();
 
-	let labels: LabelRead[] = $state([]);
-	let selectedLabelId: number | undefined = $state(); // active label for new prompts
-
 	let prompts: (ImagePromptRead | VideoPromptRead)[] = $state([]);
 	let annotations: ImageAnnotationRead[] = $state([]); // ← NEW
 
@@ -75,8 +70,8 @@
 
 	// @ts-expect-error TS2493: 'Image' not available during SSR
 	let imgEl: HTMLImageElement = $state();
-	let imgW = 1;
-	let imgH = 1; // natural resolution
+	let imgW = 1,
+		imgH = 1; // natural resolution
 
 	function handleImgLoad() {
 		imgW = imgEl?.naturalWidth;
@@ -94,12 +89,6 @@
 		annotated = alphaSort(media.filter((m) => (m as MediaRead).prompt_count > 0));
 		unannotated = alphaSort(media.filter((m) => (m as MediaRead).prompt_count === 0));
 		if (!selected && media.length) selectMedia(media[0]);
-	}
-
-	async function refreshLabels() {
-		const { data } = await listLabels({ client, path: { pid: project.id } });
-		labels = data ?? [];
-		if (labels.length && selectedLabelId === undefined) selectedLabelId = labels[0].id;
 	}
 
 	async function refreshModels() {
@@ -163,10 +152,8 @@
 		const imgRect = imgEl.getBoundingClientRect();
 
 		/* object‑contain scale factor */
-		const baseScale = Math.min(
-			imgRect.width / imgW, // scale chosen when width is the limiting side
-			imgRect.height / imgH // scale chosen when height is the limiting side
-		);
+		const baseScale = imgRect.width / imgW; // imgW set in handleImgLoad()
+
 		/* mouse position in viewer space */
 		const mx = e.clientX - mainRect.left;
 		const my = e.clientY - mainRect.top;
@@ -191,17 +178,14 @@
 		if (selected.media_type === 'image') {
 			let newPrompt: ImagePromptCreate = {
 				media_id: selected.id,
-				label_id: selectedLabelId!,
-				x: x,
-				y: y,
-				click_label: positive ? 1 : 0
+				points: [[x, y]],
+				labels: [positive ? 1 : 0]
 			};
 
 			res = await addImagePrompt({
 				client,
 				body: newPrompt,
-				path: { pid: project.id },
-				query: { model_key: selectedModelId }
+				path: { pid: project.id }
 			});
 		} else if (selected.media_type === 'video') {
 			console.error('Video prompt not implemented yet');
@@ -225,9 +209,9 @@
 	async function deleteNearestPrompt(x: number, y: number) {
 		if (!prompts.length || !selected) return;
 		pushUndo();
-		const idx = prompts.reduce((best, prompt, i) => {
-			const [ax, ay] = [prompt.x, prompt.y];
-			const [bx, by] = [prompts[best].x, prompts[best].y];
+		const idx = prompts.reduce((best, ann, i) => {
+			const [ax, ay] = (ann as any).points[0];
+			const [bx, by] = (prompts[best] as any).points[0];
 			return (ax - x) ** 2 + (ay - y) ** 2 < (bx - x) ** 2 + (by - y) ** 2 ? i : best;
 		}, 0);
 
@@ -300,12 +284,6 @@
 
 	/* ──────────────────────── keyboard shortcuts ─────────────────────── */
 	function handleKey(e: KeyboardEvent) {
-		const n = parseInt(e.key);
-		if (!isNaN(n) && n >= 1 && n <= labels.length) {
-			selectedLabelId = labels[n - 1].id;
-			e.preventDefault();
-		}
-
 		if (e.key === 'ArrowRight') {
 			nextImage();
 			return;
@@ -349,50 +327,19 @@
 		const data = imgData.data;
 
 		annotations.forEach((ann) => {
-			const colorHex = labels.find((l) => l.id === ann.label_id)?.color ?? '#ffffff';
-			const r = parseInt(colorHex.slice(1, 3), 16);
-			const g = parseInt(colorHex.slice(3, 5), 16);
-			const b = parseInt(colorHex.slice(5, 7), 16);
-
 			const mask = decodeRle(ann.mask_rle, imgW, imgH);
 			for (let i = 0; i < mask.length; i++) {
 				if (mask[i]) {
 					const idx = i * 4;
-					data[idx] = r;
-					data[idx + 1] = g;
-					data[idx + 2] = b;
-					data[idx + 3] = 128; // A
-				}
-			}
-
-			const offsets4 = [-1, 1, -imgW, imgW]; // L, R, U, D
-			const offsets8 = [-imgW - 1, -imgW, -imgW + 1, -1, 0, 1, imgW - 1, imgW, imgW + 1]; // for dilation
-
-			for (let i = 0; i < mask.length; ++i) {
-				if (!mask[i]) continue;
-
-				// is this pixel on the mask boundary?
-				const isEdge = offsets4.some((o) => {
-					const n = i + o;
-					return n < 0 || n >= mask.length ? true : !mask[n];
-				});
-
-				if (isEdge) {
-					// paint this pixel *and* its 8-connected neighbours
-					offsets8.forEach((o) => {
-						const j = i + o;
-						if (j < 0 || j >= mask.length) return;
-						const jdx = j * 4;
-						data[jdx] = r;
-						data[jdx + 1] = g;
-						data[jdx + 2] = b;
-						data[jdx + 3] = 255; // fully opaque outline
-					});
+					data[idx] = 0; // R
+					data[idx + 1] = 255; // G
+					data[idx + 2] = 0; // B
+					data[idx + 3] = 80; // A
 				}
 			}
 		});
 
-		const temp = document.createElement('canvas');
+		const temp = document.createElement('canvas'); // <-- simpler & universal
 		temp.width = imgW;
 		temp.height = imgH;
 		temp.getContext('2d')!.putImageData(imgData, 0, 0);
@@ -404,10 +351,12 @@
 		const ctx = annCanvas?.getContext('2d');
 		if (!ctx || !selected || !imgEl) return;
 
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		/* --- reset any previous transform --- */
+		ctx.setTransform(1, 0, 0, 1, 0, 0); // ← key line
 
 		const dpr = window.devicePixelRatio || 1;
 
+		/* viewer box */
 		const dispW = viewerEl.clientWidth;
 		const dispH = viewerEl.clientHeight;
 
@@ -419,36 +368,29 @@
 		ctx.scale(dpr, dpr);
 		ctx.clearRect(0, 0, dispW, dispH);
 
+		/* apply viewer-space transform */
 		const mainRect = annCanvas.getBoundingClientRect();
 		const imgRect = imgEl.getBoundingClientRect();
-		const baseScale = Math.min(
-			imgRect.width / imgW, // scale chosen when width is the limiting side
-			imgRect.height / imgH // scale chosen when height is the limiting side
-		);
+		const baseScale = imgRect.width / imgW;
 
 		ctx.translate(offsetX + (imgRect.left - mainRect.left), offsetY + (imgRect.top - mainRect.top));
 		ctx.scale(scale * baseScale, scale * baseScale);
 
-		drawMasks(ctx);
+		/* ── masks first ───────────────────────────── */
+		drawMasks(ctx); // now paints in the correct place
 
-		prompts.forEach((p) => {
-			const [x, y] = [p.x, p.y];
-			ctx.fillStyle = labels.find((l) => l.id === p.label_id)?.color ?? '#ffffff';
-			const r = 8 / (scale * baseScale);
+		/* ── then prompt points ───────────────────── */
+		prompts.forEach((ann) => {
+			const [x, y] = (ann as any).points[0];
+			ctx.fillStyle = (ann as any).labels[0] === 1 ? '#22c55e' : '#ef4444';
 			ctx.beginPath();
-			ctx.arc(x, y, r, 0, Math.PI * 2);
+			ctx.arc(x, y, 4 / (scale * baseScale), 0, Math.PI * 2);
 			ctx.fill();
-			ctx.strokeStyle = '#ffffff';
-			ctx.lineWidth = 1 / (scale * baseScale);
-			ctx.beginPath();
-			ctx.moveTo(x - r * 0.6, y);
-			ctx.lineTo(x + r * 0.6, y);
-			if (p.click_label === 1) {
-				ctx.moveTo(x, y - r * 0.6);
-				ctx.lineTo(x, y + r * 0.6);
-			}
-			ctx.stroke();
 		});
+	}
+
+	function getSelectedModel(): ModelRead | undefined {
+		return models.find((m) => m.id === Number(selectedModelId));
 	}
 
 	function getEventStream() {
@@ -459,7 +401,7 @@
 				queued.delete(msg.media_id);
 				if (selected && selected.id === msg.media_id) {
 					refreshPrompts();
-					refreshAnnotations();
+					refreshAnnotations(); // ← NEW
 				}
 				refreshMedia();
 			}
@@ -467,17 +409,16 @@
 		return es;
 	}
 
+	/* ────────────────────── lifecycle hooks ────────────────────── */
 	onMount(() => {
 		refreshMedia();
 		refreshModels();
-		refreshLabels();
-		2;
 		eventStream = getEventStream();
 	});
 	onDestroy(() => eventStream?.close());
 </script>
 
-<svelte:window onkeydown={handleKey} onresize={drawOverlay} />
+<svelte:window on:keydown={handleKey} />
 
 <!-- Header -->
 <div class="mb-6">
@@ -533,6 +474,7 @@
 				</CollapsibleContent>
 			</Collapsible>
 
+			<!-- ─── ANNOTATED ─── -->
 			<Collapsible bind:open={showAnnotated} class="mt-4">
 				<CollapsibleTrigger>
 					<Button variant="ghost" class="mb-1 w-full justify-between">
@@ -588,7 +530,7 @@
 		{#if selected}
 			{#if fileName()}
 				<div
-					class="pointer-events-none absolute top-2 left-2 z-10 rounded bg-black/60 px-2 py-1 text-lg text-white"
+					class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-2 py-1 text-lg text-white"
 				>
 					{fileName()}
 					{#if queued.has(selected.id)}
@@ -603,13 +545,13 @@
 					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}`}
 					alt={selected.path}
 					draggable="false"
-					class="absolute inset-0 m-auto h-full w-auto object-contain"
+					class="absolute inset-0 m-auto max-h-full max-w-full object-contain"
 				/>
 			{:else}
 				<video
 					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}`}
 					controls
-					class="absolute inset-0 m-auto h-full max-h-full w-auto max-w-full object-contain"
+					class="absolute inset-0 m-auto max-h-full max-w-full object-contain"
 				>
 					<track kind="captions" />
 				</video>
@@ -629,46 +571,24 @@
 				Next (U)
 			</Button>
 		</div>
-
-		<div class="mb-4">
-			<span class="mb-1 block text-sm font-medium">Labels</span>
-			<ScrollArea class="pr-1">
-				<ul class="space-y-1">
-					{#each labels as l, i}
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-						<li
-							class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/60"
-							onclick={() => (selectedLabelId = l.id)}
-							oncontextmenu={() => (selectedLabelId = l.id)}
-						>
-							<div class="h-4 w-4 rounded-full" style="background:{l.color}"></div>
-							<span class={selectedLabelId === l.id ? 'font-semibold' : ''}>
-								{i < 9 ? `(${i + 1}) ` : ''}{l.name}
-							</span>
-						</li>
-					{/each}
-				</ul>
-			</ScrollArea>
-		</div>
-
+		<!-- model picker -->
 		<div>
 			<span class="mb-1 block text-sm font-medium text-foreground">Model</span>
 
 			<Select type="single" bind:value={selectedModelId}>
 				<SelectTrigger class="w-full" placeholder="Select a model">
-					{selectedModelId}
+					{getSelectedModel()?.name}
 				</SelectTrigger>
 
 				<SelectContent>
 					{#each models as m}
-						<SelectItem value={m}>{m}</SelectItem>
+						<SelectItem value={String(m.id)}>{m.name}</SelectItem>
 					{/each}
 				</SelectContent>
 			</Select>
 		</div>
 
-		<!-- prompt list + undo/redo -->
+		<!-- annotation list + undo/redo -->
 		<div class="flex min-h-0 flex-1 flex-col">
 			<div class="mb-2 flex items-center justify-between">
 				<h4 class="text-sm font-medium">Annotations ({prompts.length})</h4>
@@ -684,20 +604,17 @@
 
 			<ScrollArea class="flex-1 overflow-y-auto pr-1">
 				<ul class="h-full space-y-1 text-xs">
-					{#each prompts as prompt}
+					{#each prompts as ann}
 						<li class="flex items-center justify-between rounded bg-muted/60 px-2 py-1">
-							<div
-								class="h-3 w-3 rounded-full"
-								style="background:{labels.find((l) => l.id === prompt.label_id)?.color}"
-							></div>
-							<span class="truncate">
-								{prompt.click_label === 1 ? '+' : '-'} • {prompt.x}, {prompt.y}
+							<span class="truncate {ann.labels[0] === 1 ? 'text-green-600' : 'text-red-600'}">
+								{ann.labels[0] === 1 ? 'Positive' : 'Negative'} • {(ann as any).points[0].join(',')}
 							</span>
 							<Button
 								variant="ghost"
 								size="icon"
 								class="ml-2 text-muted-foreground hover:text-destructive"
-								onclick={() => deleteNearestPrompt(prompt.x, prompt.y)}
+								onclick={() =>
+									deleteNearestPrompt((ann as any).points[0][0], (ann as any).points[0][1])}
 							>
 								&times;
 							</Button>

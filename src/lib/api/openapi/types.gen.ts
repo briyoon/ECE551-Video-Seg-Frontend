@@ -21,43 +21,145 @@ export type HttpValidationError = {
 };
 
 /**
- * ImageAnnotationCreate
- */
-export type ImageAnnotationCreate = {
-    /**
-     * Points
-     */
-    points: Array<Array<number>>;
-    /**
-     * Labels
-     */
-    labels: Array<number>;
-    /**
-     * Media Id
-     */
-    media_id: number;
-};
-
-/**
  * ImageAnnotationRead
  */
 export type ImageAnnotationRead = {
     /**
-     * Points
+     * Id
      */
-    points: Array<Array<number>>;
+    id: number;
     /**
-     * Labels
+     * Prompt Id
      */
-    labels: Array<number>;
+    prompt_id: number;
+    /**
+     * Project Id
+     */
+    project_id: number | null;
     /**
      * Media Id
      */
     media_id: number;
     /**
+     * Label Id
+     */
+    label_id: number;
+    model_id: ModelKeys | null;
+    /**
+     * Mask Rle
+     */
+    mask_rle: string | null;
+};
+
+/**
+ * ImagePromptCreate
+ */
+export type ImagePromptCreate = {
+    /**
+     * Media Id
+     */
+    media_id: number;
+    /**
+     * Label Id
+     */
+    label_id: number;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+    /**
+     * Click Label
+     */
+    click_label: number;
+};
+
+/**
+ * ImagePromptRead
+ */
+export type ImagePromptRead = {
+    /**
+     * Media Id
+     */
+    media_id: number;
+    /**
+     * Label Id
+     */
+    label_id: number;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+    /**
+     * Click Label
+     */
+    click_label: number;
+    /**
      * Id
      */
     id: number;
+    /**
+     * Project Id
+     */
+    project_id: number;
+};
+
+/**
+ * LabelCreate
+ */
+export type LabelCreate = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Color
+     * Hex colour code, with or without leading #
+     */
+    color?: string | null;
+};
+
+/**
+ * LabelRead
+ */
+export type LabelRead = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Project Id
+     */
+    project_id: number;
+    /**
+     * Color
+     */
+    color: string;
+};
+
+/**
+ * LabelUpdate
+ */
+export type LabelUpdate = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Color
+     */
+    color?: string | null;
 };
 
 /**
@@ -88,51 +190,16 @@ export type MediaRead = {
      * Fps
      */
     fps?: number | null;
+    /**
+     * Prompt Count
+     */
+    prompt_count: number;
 };
 
 /**
- * ModelCreate
+ * ModelKeys
  */
-export type ModelCreate = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Engine
-     */
-    engine?: 'torch' | 'tensorrt';
-    /**
-     * Compiled
-     */
-    compiled?: boolean;
-};
-
-/**
- * ModelRead
- */
-export type ModelRead = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Engine
-     */
-    engine?: 'torch' | 'tensorrt';
-    /**
-     * Compiled
-     */
-    compiled?: boolean;
-    /**
-     * Id
-     */
-    id: number;
-    /**
-     * Path
-     */
-    path: string | null;
-};
+export type ModelKeys = 'sam2.1_hiera_tiny' | 'sam2.1_hiera_small' | 'sam2.1_hiera_base+' | 'sam2.1_hiera_large';
 
 /**
  * ProjectCreate
@@ -164,10 +231,7 @@ export type ProjectRead = {
      * Id
      */
     id: number;
-    /**
-     * Default Model Id
-     */
-    default_model_id?: number | null;
+    default_model_id: ModelKeys;
 };
 
 /**
@@ -178,10 +242,17 @@ export type ProjectUpdate = {
      * Name
      */
     name?: string | null;
+    default_model_id: ModelKeys;
+};
+
+/**
+ * QueueMsg
+ */
+export type QueueMsg = {
     /**
-     * Default Model Id
+     * Detail
      */
-    default_model_id?: number | null;
+    detail?: string;
 };
 
 /**
@@ -203,43 +274,21 @@ export type ValidationError = {
 };
 
 /**
- * VideoAnnotationCreate
- */
-export type VideoAnnotationCreate = {
-    /**
-     * Points
-     */
-    points: Array<Array<number>>;
-    /**
-     * Labels
-     */
-    labels: Array<number>;
-    /**
-     * Media Id
-     */
-    media_id: number;
-    /**
-     * Frame Idx
-     */
-    frame_idx: number;
-    /**
-     * Obj Idx
-     */
-    obj_idx: number;
-};
-
-/**
  * VideoAnnotationRead
  */
 export type VideoAnnotationRead = {
     /**
-     * Points
+     * Id
      */
-    points: Array<Array<number>>;
+    id: number;
     /**
-     * Labels
+     * Prompt Id
      */
-    labels: Array<number>;
+    prompt_id: number;
+    /**
+     * Project Id
+     */
+    project_id: number | null;
     /**
      * Media Id
      */
@@ -252,6 +301,79 @@ export type VideoAnnotationRead = {
      * Obj Idx
      */
     obj_idx: number;
+    model_id: ModelKeys | null;
+    /**
+     * Mask Rle
+     */
+    mask_rle: string | null;
+};
+
+/**
+ * VideoPromptCreate
+ */
+export type VideoPromptCreate = {
+    /**
+     * Media Id
+     */
+    media_id: number;
+    /**
+     * Label Id
+     */
+    label_id: number;
+    /**
+     * Frame Idx
+     */
+    frame_idx: number;
+    /**
+     * Obj Idx
+     */
+    obj_idx: number;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+    /**
+     * Click Label
+     */
+    click_label: number;
+};
+
+/**
+ * VideoPromptRead
+ */
+export type VideoPromptRead = {
+    /**
+     * Media Id
+     */
+    media_id: number;
+    /**
+     * Label Id
+     */
+    label_id: number;
+    /**
+     * Frame Idx
+     */
+    frame_idx: number;
+    /**
+     * Obj Idx
+     */
+    obj_idx: number;
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+    /**
+     * Click Label
+     */
+    click_label: number;
     /**
      * Id
      */
@@ -390,6 +512,34 @@ export type UpdateProjectApiV1ProjectsPidPatchResponses = {
 
 export type UpdateProjectApiV1ProjectsPidPatchResponse = UpdateProjectApiV1ProjectsPidPatchResponses[keyof UpdateProjectApiV1ProjectsPidPatchResponses];
 
+export type ProjectEventsApiV1ProjectsPidEventsGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/events';
+};
+
+export type ProjectEventsApiV1ProjectsPidEventsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ProjectEventsApiV1ProjectsPidEventsGetError = ProjectEventsApiV1ProjectsPidEventsGetErrors[keyof ProjectEventsApiV1ProjectsPidEventsGetErrors];
+
+export type ProjectEventsApiV1ProjectsPidEventsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListMediaApiV1ProjectsPidMediaGetData = {
     body?: never;
     path: {
@@ -513,141 +663,24 @@ export type GetMediaApiV1ProjectsPidMediaMidGetResponses = {
     200: unknown;
 };
 
-export type ListApiV1ProjectsPidModelsGetData = {
+export type ListModelsApiV1ModelsGetData = {
     body?: never;
-    path: {
-        /**
-         * Pid
-         */
-        pid: number;
-    };
+    path?: never;
     query?: never;
-    url: '/api/v1/projects/{pid}/models';
+    url: '/api/v1/models';
 };
 
-export type ListApiV1ProjectsPidModelsGetErrors = {
+export type ListModelsApiV1ModelsGetResponses = {
     /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ListApiV1ProjectsPidModelsGetError = ListApiV1ProjectsPidModelsGetErrors[keyof ListApiV1ProjectsPidModelsGetErrors];
-
-export type ListApiV1ProjectsPidModelsGetResponses = {
-    /**
-     * Response List  Api V1 Projects  Pid  Models Get
+     * Response List Models Api V1 Models Get
      * Successful Response
      */
-    200: Array<ModelRead>;
+    200: Array<string>;
 };
 
-export type ListApiV1ProjectsPidModelsGetResponse = ListApiV1ProjectsPidModelsGetResponses[keyof ListApiV1ProjectsPidModelsGetResponses];
+export type ListModelsApiV1ModelsGetResponse = ListModelsApiV1ModelsGetResponses[keyof ListModelsApiV1ModelsGetResponses];
 
-export type AddApiV1ProjectsPidModelsPostData = {
-    body: ModelCreate;
-    path: {
-        /**
-         * Pid
-         */
-        pid: number;
-    };
-    query?: never;
-    url: '/api/v1/projects/{pid}/models';
-};
-
-export type AddApiV1ProjectsPidModelsPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AddApiV1ProjectsPidModelsPostError = AddApiV1ProjectsPidModelsPostErrors[keyof AddApiV1ProjectsPidModelsPostErrors];
-
-export type AddApiV1ProjectsPidModelsPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: ModelRead;
-};
-
-export type AddApiV1ProjectsPidModelsPostResponse = AddApiV1ProjectsPidModelsPostResponses[keyof AddApiV1ProjectsPidModelsPostResponses];
-
-export type RemoveApiV1ProjectsPidModelsMidDeleteData = {
-    body?: never;
-    path: {
-        /**
-         * Pid
-         */
-        pid: number;
-        /**
-         * Mid
-         */
-        mid: number;
-    };
-    query?: never;
-    url: '/api/v1/projects/{pid}/models/{mid}';
-};
-
-export type RemoveApiV1ProjectsPidModelsMidDeleteErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type RemoveApiV1ProjectsPidModelsMidDeleteError = RemoveApiV1ProjectsPidModelsMidDeleteErrors[keyof RemoveApiV1ProjectsPidModelsMidDeleteErrors];
-
-export type RemoveApiV1ProjectsPidModelsMidDeleteResponses = {
-    /**
-     * Successful Response
-     */
-    204: void;
-};
-
-export type RemoveApiV1ProjectsPidModelsMidDeleteResponse = RemoveApiV1ProjectsPidModelsMidDeleteResponses[keyof RemoveApiV1ProjectsPidModelsMidDeleteResponses];
-
-export type PatchApiV1ProjectsPidModelsMidPatchData = {
-    body?: never;
-    path: {
-        /**
-         * Pid
-         */
-        pid: number;
-        /**
-         * Mid
-         */
-        mid: number;
-    };
-    query?: {
-        /**
-         * Compiled
-         */
-        compiled?: boolean | null;
-    };
-    url: '/api/v1/projects/{pid}/models/{mid}';
-};
-
-export type PatchApiV1ProjectsPidModelsMidPatchErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type PatchApiV1ProjectsPidModelsMidPatchError = PatchApiV1ProjectsPidModelsMidPatchErrors[keyof PatchApiV1ProjectsPidModelsMidPatchErrors];
-
-export type PatchApiV1ProjectsPidModelsMidPatchResponses = {
-    /**
-     * Successful Response
-     */
-    200: ModelRead;
-};
-
-export type PatchApiV1ProjectsPidModelsMidPatchResponse = PatchApiV1ProjectsPidModelsMidPatchResponses[keyof PatchApiV1ProjectsPidModelsMidPatchResponses];
-
-export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetData = {
+export type ListImagePromptsApiV1ProjectsPidPromptsImageGetData = {
     body?: never;
     path: {
         /**
@@ -662,59 +695,64 @@ export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetData = {
          */
         media_id?: number | null;
     };
-    url: '/api/v1/projects/{pid}/annotations/image';
+    url: '/api/v1/projects/{pid}/prompts/image';
 };
 
-export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetErrors = {
+export type ListImagePromptsApiV1ProjectsPidPromptsImageGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetError = ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetErrors[keyof ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetErrors];
+export type ListImagePromptsApiV1ProjectsPidPromptsImageGetError = ListImagePromptsApiV1ProjectsPidPromptsImageGetErrors[keyof ListImagePromptsApiV1ProjectsPidPromptsImageGetErrors];
 
-export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponses = {
+export type ListImagePromptsApiV1ProjectsPidPromptsImageGetResponses = {
     /**
-     * Response List Image Annotations Api V1 Projects  Pid  Annotations Image Get
+     * Response List Image Prompts Api V1 Projects  Pid  Prompts Image Get
      * Successful Response
      */
-    200: Array<ImageAnnotationRead>;
+    200: Array<ImagePromptRead>;
 };
 
-export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponse = ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponses[keyof ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponses];
+export type ListImagePromptsApiV1ProjectsPidPromptsImageGetResponse = ListImagePromptsApiV1ProjectsPidPromptsImageGetResponses[keyof ListImagePromptsApiV1ProjectsPidPromptsImageGetResponses];
 
-export type AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostData = {
-    body: ImageAnnotationCreate;
+export type AddImagePromptApiV1ProjectsPidPromptsImagePostData = {
+    body: ImagePromptCreate;
     path: {
         /**
          * Pid
          */
         pid: number;
     };
-    query?: never;
-    url: '/api/v1/projects/{pid}/annotations/image';
+    query?: {
+        /**
+         * Model Key
+         */
+        model_key?: string | null;
+    };
+    url: '/api/v1/projects/{pid}/prompts/image';
 };
 
-export type AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostErrors = {
+export type AddImagePromptApiV1ProjectsPidPromptsImagePostErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostError = AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostErrors[keyof AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostErrors];
+export type AddImagePromptApiV1ProjectsPidPromptsImagePostError = AddImagePromptApiV1ProjectsPidPromptsImagePostErrors[keyof AddImagePromptApiV1ProjectsPidPromptsImagePostErrors];
 
-export type AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostResponses = {
+export type AddImagePromptApiV1ProjectsPidPromptsImagePostResponses = {
     /**
      * Successful Response
      */
-    200: ImageAnnotationRead;
+    202: QueueMsg;
 };
 
-export type AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostResponse = AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostResponses[keyof AddImageAnnotationApiV1ProjectsPidAnnotationsImagePostResponses];
+export type AddImagePromptApiV1ProjectsPidPromptsImagePostResponse = AddImagePromptApiV1ProjectsPidPromptsImagePostResponses[keyof AddImagePromptApiV1ProjectsPidPromptsImagePostResponses];
 
-export type DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteData = {
+export type DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteData = {
     body?: never;
     path: {
         /**
@@ -726,29 +764,34 @@ export type DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteData =
          */
         aid: number;
     };
-    query?: never;
-    url: '/api/v1/projects/{pid}/annotations/image/{aid}';
+    query?: {
+        /**
+         * Model Key
+         */
+        model_key?: string | null;
+    };
+    url: '/api/v1/projects/{pid}/prompts/image/{aid}';
 };
 
-export type DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteErrors = {
+export type DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteError = DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteErrors[keyof DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteErrors];
+export type DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteError = DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteErrors[keyof DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteErrors];
 
-export type DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteResponses = {
+export type DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteResponses = {
     /**
      * Successful Response
      */
-    204: void;
+    202: QueueMsg;
 };
 
-export type DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteResponse = DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteResponses[keyof DeleteImageAnnotationApiV1ProjectsPidAnnotationsImageAidDeleteResponses];
+export type DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteResponse = DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteResponses[keyof DeleteImagePromptApiV1ProjectsPidPromptsImageAidDeleteResponses];
 
-export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetData = {
+export type ListVideoPromptsApiV1ProjectsPidPromptsVideoGetData = {
     body?: never;
     path: {
         /**
@@ -770,7 +813,168 @@ export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetData = {
          */
         frame_idx?: number | null;
     };
-    url: '/api/v1/projects/{pid}/annotations/video';
+    url: '/api/v1/projects/{pid}/prompts/video';
+};
+
+export type ListVideoPromptsApiV1ProjectsPidPromptsVideoGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListVideoPromptsApiV1ProjectsPidPromptsVideoGetError = ListVideoPromptsApiV1ProjectsPidPromptsVideoGetErrors[keyof ListVideoPromptsApiV1ProjectsPidPromptsVideoGetErrors];
+
+export type ListVideoPromptsApiV1ProjectsPidPromptsVideoGetResponses = {
+    /**
+     * Response List Video Prompts Api V1 Projects  Pid  Prompts Video Get
+     * Successful Response
+     */
+    200: Array<VideoPromptRead>;
+};
+
+export type ListVideoPromptsApiV1ProjectsPidPromptsVideoGetResponse = ListVideoPromptsApiV1ProjectsPidPromptsVideoGetResponses[keyof ListVideoPromptsApiV1ProjectsPidPromptsVideoGetResponses];
+
+export type AddVideoPromptApiV1ProjectsPidPromptsVideoPostData = {
+    body: VideoPromptCreate;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/prompts/video';
+};
+
+export type AddVideoPromptApiV1ProjectsPidPromptsVideoPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddVideoPromptApiV1ProjectsPidPromptsVideoPostError = AddVideoPromptApiV1ProjectsPidPromptsVideoPostErrors[keyof AddVideoPromptApiV1ProjectsPidPromptsVideoPostErrors];
+
+export type AddVideoPromptApiV1ProjectsPidPromptsVideoPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: QueueMsg;
+};
+
+export type AddVideoPromptApiV1ProjectsPidPromptsVideoPostResponse = AddVideoPromptApiV1ProjectsPidPromptsVideoPostResponses[keyof AddVideoPromptApiV1ProjectsPidPromptsVideoPostResponses];
+
+export type DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+        /**
+         * Aid
+         */
+        aid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/prompts/video/{aid}';
+};
+
+export type DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteError = DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteErrors[keyof DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteErrors];
+
+export type DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    202: QueueMsg;
+};
+
+export type DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteResponse = DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteResponses[keyof DeleteVideoPromptApiV1ProjectsPidPromptsVideoAidDeleteResponses];
+
+export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/annotations/image/';
+};
+
+export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetError = ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetErrors[keyof ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetErrors];
+
+export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponses = {
+    /**
+     * Response List Image Annotations Api V1 Projects  Pid  Annotations Image  Get
+     * Successful Response
+     */
+    200: Array<ImageAnnotationRead>;
+};
+
+export type ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponse = ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponses[keyof ListImageAnnotationsApiV1ProjectsPidAnnotationsImageGetResponses];
+
+export type GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+        /**
+         * Mid
+         */
+        mid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/annotations/image/{mid}';
+};
+
+export type GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetError = GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetErrors[keyof GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetErrors];
+
+export type GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetResponses = {
+    /**
+     * Response Get Image Annotation Api V1 Projects  Pid  Annotations Image  Mid  Get
+     * Successful Response
+     */
+    200: Array<ImageAnnotationRead>;
+};
+
+export type GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetResponse = GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetResponses[keyof GetImageAnnotationApiV1ProjectsPidAnnotationsImageMidGetResponses];
+
+export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/annotations/video/';
 };
 
 export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetErrors = {
@@ -784,7 +988,7 @@ export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetError = ListV
 
 export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetResponses = {
     /**
-     * Response List Video Annotations Api V1 Projects  Pid  Annotations Video Get
+     * Response List Video Annotations Api V1 Projects  Pid  Annotations Video  Get
      * Successful Response
      */
     200: Array<VideoAnnotationRead>;
@@ -792,37 +996,7 @@ export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetResponses = {
 
 export type ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetResponse = ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetResponses[keyof ListVideoAnnotationsApiV1ProjectsPidAnnotationsVideoGetResponses];
 
-export type AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostData = {
-    body: VideoAnnotationCreate;
-    path: {
-        /**
-         * Pid
-         */
-        pid: number;
-    };
-    query?: never;
-    url: '/api/v1/projects/{pid}/annotations/video';
-};
-
-export type AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostError = AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostErrors[keyof AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostErrors];
-
-export type AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: VideoAnnotationRead;
-};
-
-export type AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostResponse = AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostResponses[keyof AddVideoAnnotationApiV1ProjectsPidAnnotationsVideoPostResponses];
-
-export type DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteData = {
+export type GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetData = {
     body?: never;
     path: {
         /**
@@ -830,31 +1004,198 @@ export type DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteData =
          */
         pid: number;
         /**
-         * Aid
+         * Mid
          */
-        aid: number;
+        mid: number;
     };
-    query?: never;
-    url: '/api/v1/projects/{pid}/annotations/video/{aid}';
+    query?: {
+        /**
+         * Frame Idx
+         */
+        frame_idx?: number | null;
+        /**
+         * Obj Idx
+         */
+        obj_idx?: number | null;
+    };
+    url: '/api/v1/projects/{pid}/annotations/video/{mid}';
 };
 
-export type DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteErrors = {
+export type GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteError = DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteErrors[keyof DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteErrors];
+export type GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetError = GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetErrors[keyof GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetErrors];
 
-export type DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteResponses = {
+export type GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetResponses = {
+    /**
+     * Response Get Video Annotation Api V1 Projects  Pid  Annotations Video  Mid  Get
+     * Successful Response
+     */
+    200: Array<VideoAnnotationRead>;
+};
+
+export type GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetResponse = GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetResponses[keyof GetVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGetResponses];
+
+export type ListLabelsApiV1ProjectsPidLabelsGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/labels';
+};
+
+export type ListLabelsApiV1ProjectsPidLabelsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListLabelsApiV1ProjectsPidLabelsGetError = ListLabelsApiV1ProjectsPidLabelsGetErrors[keyof ListLabelsApiV1ProjectsPidLabelsGetErrors];
+
+export type ListLabelsApiV1ProjectsPidLabelsGetResponses = {
+    /**
+     * Response List Labels Api V1 Projects  Pid  Labels Get
+     * Successful Response
+     */
+    200: Array<LabelRead>;
+};
+
+export type ListLabelsApiV1ProjectsPidLabelsGetResponse = ListLabelsApiV1ProjectsPidLabelsGetResponses[keyof ListLabelsApiV1ProjectsPidLabelsGetResponses];
+
+export type CreateLabelApiV1ProjectsPidLabelsPostData = {
+    body: LabelCreate;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/labels';
+};
+
+export type CreateLabelApiV1ProjectsPidLabelsPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateLabelApiV1ProjectsPidLabelsPostError = CreateLabelApiV1ProjectsPidLabelsPostErrors[keyof CreateLabelApiV1ProjectsPidLabelsPostErrors];
+
+export type CreateLabelApiV1ProjectsPidLabelsPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: LabelRead;
+};
+
+export type CreateLabelApiV1ProjectsPidLabelsPostResponse = CreateLabelApiV1ProjectsPidLabelsPostResponses[keyof CreateLabelApiV1ProjectsPidLabelsPostResponses];
+
+export type DeleteLabelApiV1ProjectsPidLabelsLidDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+        /**
+         * Lid
+         */
+        lid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/labels/{lid}';
+};
+
+export type DeleteLabelApiV1ProjectsPidLabelsLidDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteLabelApiV1ProjectsPidLabelsLidDeleteError = DeleteLabelApiV1ProjectsPidLabelsLidDeleteErrors[keyof DeleteLabelApiV1ProjectsPidLabelsLidDeleteErrors];
+
+export type DeleteLabelApiV1ProjectsPidLabelsLidDeleteResponses = {
     /**
      * Successful Response
      */
     204: void;
 };
 
-export type DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteResponse = DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteResponses[keyof DeleteVideoAnnotationApiV1ProjectsPidAnnotationsVideoAidDeleteResponses];
+export type DeleteLabelApiV1ProjectsPidLabelsLidDeleteResponse = DeleteLabelApiV1ProjectsPidLabelsLidDeleteResponses[keyof DeleteLabelApiV1ProjectsPidLabelsLidDeleteResponses];
+
+export type UpdateLabelApiV1ProjectsPidLabelsLidPatchData = {
+    body: LabelUpdate;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+        /**
+         * Lid
+         */
+        lid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/labels/{lid}';
+};
+
+export type UpdateLabelApiV1ProjectsPidLabelsLidPatchErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateLabelApiV1ProjectsPidLabelsLidPatchError = UpdateLabelApiV1ProjectsPidLabelsLidPatchErrors[keyof UpdateLabelApiV1ProjectsPidLabelsLidPatchErrors];
+
+export type UpdateLabelApiV1ProjectsPidLabelsLidPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: LabelRead;
+};
+
+export type UpdateLabelApiV1ProjectsPidLabelsLidPatchResponse = UpdateLabelApiV1ProjectsPidLabelsLidPatchResponses[keyof UpdateLabelApiV1ProjectsPidLabelsLidPatchResponses];
+
+export type ExportProjectApiV1ProjectsPidExportGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/export';
+};
+
+export type ExportProjectApiV1ProjectsPidExportGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ExportProjectApiV1ProjectsPidExportGetError = ExportProjectApiV1ProjectsPidExportGetErrors[keyof ExportProjectApiV1ProjectsPidExportGetErrors];
+
+export type ExportProjectApiV1ProjectsPidExportGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ClientOptions = {
     baseUrl: `${string}://static` | (string & {});

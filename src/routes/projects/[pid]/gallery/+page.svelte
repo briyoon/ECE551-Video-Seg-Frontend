@@ -14,9 +14,8 @@
 
 	import type { MediaRead, ProjectRead } from '$lib/api/openapi/types.gen';
 	import {
-		addMediaApiV1ProjectsPidMediaPost,
-		deleteMediaApiV1ProjectsPidMediaMidDelete,
-		getMediaApiV1ProjectsPidMediaMidGet
+		addMediaApiV1ProjectsPidMediaPost as addMedia,
+		deleteMediaApiV1ProjectsPidMediaMidDelete as deleteMedia
 	} from '$lib/api/openapi/sdk.gen';
 	import { client } from '$lib/api/client';
 	import ProjectNav from '$lib/components/ProjectNav.svelte';
@@ -50,7 +49,7 @@
 				toast.error(`Unsupported file type: ${f.name}`);
 				continue;
 			}
-			const { data: created, response } = await addMediaApiV1ProjectsPidMediaPost({
+			const { data: created, response } = await addMedia({
 				client,
 				path: { pid: project.id },
 				body: { file: f }
@@ -68,7 +67,7 @@
 	let detail: MediaRead | null = null;
 	async function del(item: MediaRead) {
 		if (!confirm(`Delete “${item.path}”?`)) return;
-		const res = await deleteMediaApiV1ProjectsPidMediaMidDelete({
+		const res = await deleteMedia({
 			client,
 			path: { pid: project.id, mid: item.id }
 		});
@@ -98,8 +97,7 @@
 			[
 				{ name: 'Gallery', href: `/projects/${project.id}/gallery`, active: true },
 				{ name: 'Studio', href: `/projects/${project.id}/studio` },
-				{ name: 'Models', href: `/projects/${project.id}/models` },
-				{ name: 'Export', href: `/projects/${project.id}/export` }
+				{ name: 'Labels', href: `/projects/${project.id}/labels` }
 			]
 		]}
 	/>
