@@ -12,7 +12,6 @@
 	import ProjectNav from '$lib/components/ProjectNav.svelte';
 
 	const projects = getContext<ProjectRead[]>('projectlist');
-	console.log('Projects:', projects);
 </script>
 
 <div class="mb-6">
@@ -29,7 +28,7 @@
 				<CardHeader>
 					<CardTitle class="text-lg font-semibold text-gray-900 hover:underline">{p.name}</CardTitle
 					>
-					<CardDescription class="text-sm text-muted-foreground capitalize"
+					<CardDescription class="text-muted-foreground text-sm capitalize"
 						>{p.media_type}</CardDescription
 					>
 				</CardHeader>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount } from 'svelte';
 	import {
 		Dialog,
 		DialogContent,
@@ -84,8 +84,10 @@
 				if (e.isIntersecting) visible += increment;
 			});
 		});
-		io.observe(sentinel);
-		return () => io.disconnect();
+
+		if (sentinel) io.observe(sentinel);
+
+		onDestroy(() => io.disconnect());
 	});
 </script>
 
@@ -165,7 +167,7 @@
 		<div
 			role="region"
 			aria-label="File drop area"
-			class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm text-muted-foreground/70 transition-colors hover:border-primary hover:text-primary"
+			class="text-muted-foreground/70 hover:border-primary hover:text-primary flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-sm transition-colors"
 			ondrop={(e) => {
 				if (e.dataTransfer) handleFiles(e.dataTransfer.files);
 			}}
@@ -221,8 +223,8 @@
 				</Button>
 			</DialogFooter>
 		</DialogContent>
-		<DialogClose class="absolute top-2 right-2">
-			<XIcon class="h-6 w-6 text-muted-foreground hover:cursor-pointer hover:text-primary" />
+		<DialogClose class="absolute right-2 top-2">
+			<XIcon class="text-muted-foreground hover:text-primary h-6 w-6 hover:cursor-pointer" />
 		</DialogClose>
 	</Dialog>
 {/if}
