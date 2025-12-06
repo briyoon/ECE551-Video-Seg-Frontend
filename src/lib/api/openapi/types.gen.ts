@@ -191,6 +191,10 @@ export type MediaRead = {
      */
     fps?: number | null;
     /**
+     * Frame Count
+     */
+    frame_count?: number | null;
+    /**
      * Prompt Count
      */
     prompt_count: number;
@@ -294,6 +298,10 @@ export type VideoAnnotationRead = {
      */
     media_id: number;
     /**
+     * Label Id
+     */
+    label_id: number;
+    /**
      * Frame Idx
      */
     frame_idx: number;
@@ -329,17 +337,13 @@ export type VideoPromptCreate = {
      */
     obj_idx: number;
     /**
-     * X
+     * Points
      */
-    x: number;
+    points: Array<Array<number>>;
     /**
-     * Y
+     * Labels
      */
-    y: number;
-    /**
-     * Click Label
-     */
-    click_label: number;
+    labels: Array<number>;
 };
 
 /**
@@ -363,17 +367,13 @@ export type VideoPromptRead = {
      */
     obj_idx: number;
     /**
-     * X
+     * Points
      */
-    x: number;
+    points: Array<Array<number>>;
     /**
-     * Y
+     * Labels
      */
-    y: number;
-    /**
-     * Click Label
-     */
-    click_label: number;
+    labels: Array<number>;
     /**
      * Id
      */
@@ -663,6 +663,42 @@ export type GetMediaApiV1ProjectsPidMediaMidGetResponses = {
     200: unknown;
 };
 
+export type GetVideoFrameApiV1ProjectsPidMediaMidFramesFrameIdxGetData = {
+    body?: never;
+    path: {
+        /**
+         * Pid
+         */
+        pid: number;
+        /**
+         * Mid
+         */
+        mid: number;
+        /**
+         * Frame Idx
+         */
+        frame_idx: number;
+    };
+    query?: never;
+    url: '/api/v1/projects/{pid}/media/{mid}/frames/{frame_idx}';
+};
+
+export type GetVideoFrameApiV1ProjectsPidMediaMidFramesFrameIdxGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetVideoFrameApiV1ProjectsPidMediaMidFramesFrameIdxGetError = GetVideoFrameApiV1ProjectsPidMediaMidFramesFrameIdxGetErrors[keyof GetVideoFrameApiV1ProjectsPidMediaMidFramesFrameIdxGetErrors];
+
+export type GetVideoFrameApiV1ProjectsPidMediaMidFramesFrameIdxGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListModelsApiV1ModelsGetData = {
     body?: never;
     path?: never;
@@ -843,7 +879,9 @@ export type AddVideoPromptApiV1ProjectsPidPromptsVideoPostData = {
          */
         pid: number;
     };
-    query?: never;
+    query?: {
+        model_key?: ModelKeys;
+    };
     url: '/api/v1/projects/{pid}/prompts/video';
 };
 

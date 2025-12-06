@@ -25,6 +25,11 @@
 	export let data: { media: MediaRead[] };
 	const project = /** @type {ProjectRead} */ (/** @ts-ignore */ getContext<ProjectRead>('project'));
 
+	// Safety check
+	if (!project) {
+		console.error('Project context is missing!');
+	}
+
 	/* ------------------------------ state ------------------------------ */
 	let media: MediaRead[] = data.media;
 
@@ -95,11 +100,11 @@
 	<ProjectNav
 		content={[
 			{ name: 'Projects', href: '/' },
-			{ name: project.name, href: `/projects/${project.id}` },
+			{ name: project?.name ?? 'Loading...', href: `/projects/${project?.id ?? ''}` },
 			[
-				{ name: 'Gallery', href: `/projects/${project.id}/gallery`, active: true },
-				{ name: 'Studio', href: `/projects/${project.id}/studio` },
-				{ name: 'Labels', href: `/projects/${project.id}/labels` }
+				{ name: 'Gallery', href: `/projects/${project?.id ?? ''}/gallery`, active: true },
+				{ name: 'Studio', href: `/projects/${project?.id ?? ''}/studio` },
+				{ name: 'Labels', href: `/projects/${project?.id ?? ''}/labels` }
 			]
 		]}
 	/>

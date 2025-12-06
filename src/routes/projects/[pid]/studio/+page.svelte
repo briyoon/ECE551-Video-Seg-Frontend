@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext, onMount, onDestroy } from 'svelte';
 	import ProjectNav from '$lib/components/ProjectNav.svelte';
+	import VideoPlayer from '$lib/components/VideoPlayer.svelte';
 	import { PUBLIC_API_BASE } from '$env/static/public';
 
 	// shadcn‑svelte UI components
@@ -16,6 +17,7 @@
 		ImagePromptCreate,
 		VideoPromptCreate,
 		ImageAnnotationRead,
+		VideoAnnotationRead,
 		LabelRead
 	} from '$lib/api/openapi/types.gen';
 	import {
@@ -26,6 +28,9 @@
 		addImagePromptApiV1ProjectsPidPromptsImagePost as addImagePrompt,
 		deleteImagePromptApiV1ProjectsPidPromptsImageAidDelete as deleteImagePrompt,
 		getImageAnnotationApiV1ProjectsPidAnnotationsImageMidGet as getImageAnnotation,
+		getVideoAnnotationApiV1ProjectsPidAnnotationsVideoMidGet as getVideoAnnotation,
+		addVideoPromptApiV1ProjectsPidPromptsVideoPost as addVideoPrompt,
+		deleteVideoPromptApiV1ProjectsPidPromptsVideoAidDelete as deleteVideoPrompt,
 		listLabelsApiV1ProjectsPidLabelsGet as listLabels
 	} from '$lib/api/openapi/sdk.gen';
 	import { client } from '$lib/api/client';
@@ -59,7 +64,10 @@
 	let selectedLabelId: number | undefined = $state(); // active label for new prompts
 
 	let prompts: (ImagePromptRead | VideoPromptRead)[] = $state([]);
-	let annotations: ImageAnnotationRead[] = $state([]); // ← NEW
+	let annotations: (ImageAnnotationRead | VideoAnnotationRead)[] = $state([]);
+
+	// video specific
+	let currentFrameIdx = $state(0);
 
 	// viewer transform
 	let scale = 1;
@@ -121,7 +129,7 @@
 			const { data } = await listVideoPrompt({
 				client,
 				path: { pid: project.id },
-				query: { media_id: selected.id }
+				query: { media_id: selected.id, frame_idx: currentFrameIdx }
 			});
 			prompts = data ?? [];
 		}
@@ -129,12 +137,21 @@
 	}
 
 	async function refreshAnnotations() {
-		if (!selected || selected.media_type !== 'image') return;
-		const { data } = await getImageAnnotation({
-			client,
-			path: { pid: project.id, mid: selected.id }
-		});
-		annotations = data ?? [];
+		if (!selected) return;
+		if (selected.media_type === 'image') {
+			const { data } = await getImageAnnotation({
+				client,
+				path: { pid: project.id, mid: selected.id }
+			});
+			annotations = data ?? [];
+		} else {
+			const { data } = await getVideoAnnotation({
+				client,
+				path: { pid: project.id, mid: selected.id },
+				query: { frame_idx: currentFrameIdx }
+			});
+			annotations = data ?? [];
+		}
 		drawOverlay();
 	}
 
@@ -143,6 +160,7 @@
 		scale = 1;
 		offsetX = 0;
 		offsetY = 0;
+		currentFrameIdx = 0; // Reset frame index
 		refreshPrompts();
 		refreshAnnotations();
 	}
@@ -152,6 +170,10 @@
 	}
 
 	/* ─────────────────── annotation operations ─────────────────── */
+	function isImagePrompt(p: ImagePromptRead | VideoPromptRead): p is ImagePromptRead {
+		return 'x' in p;
+	}
+
 	function pushUndo() {
 		undoStack.push(JSON.parse(JSON.stringify(prompts)));
 		redoStack = [];
@@ -201,11 +223,24 @@
 				client,
 				body: newPrompt,
 				path: { pid: project.id },
-				query: { model_key: selectedModelId }
+				query: { model_key: selectedModelId as any }
 			});
 		} else if (selected.media_type === 'video') {
-			console.error('Video prompt not implemented yet');
-			return;
+			let newPrompt: VideoPromptCreate = {
+				media_id: selected.id,
+				label_id: selectedLabelId!,
+				frame_idx: currentFrameIdx,
+				obj_idx: 0, // Defaulting to 0 for single object focus or simple test
+				points: [[x, y]],
+				labels: [positive ? 1 : 0]
+			};
+
+			res = await addVideoPrompt({
+				client,
+				path: { pid: project.id },
+				body: newPrompt,
+				query: { model_key: selectedModelId as any }
+			});
 		} else {
 			console.error('Unsupported media type for prompt:', selected.media_type);
 			return;
@@ -226,8 +261,29 @@
 		if (!prompts.length || !selected) return;
 		pushUndo();
 		const idx = prompts.reduce((best, prompt, i) => {
-			const [ax, ay] = [prompt.x, prompt.y];
-			const [bx, by] = [prompts[best].x, prompts[best].y];
+			let px = 0,
+				py = 0;
+			if (isImagePrompt(prompt)) {
+				px = prompt.x;
+				py = prompt.y;
+			} else {
+				px = prompt.points[0][0];
+				py = prompt.points[0][1];
+			}
+
+			const [ax, ay] = [px, py];
+
+			let bx = 0,
+				by = 0;
+			const bestP = prompts[best];
+			if (isImagePrompt(bestP)) {
+				bx = bestP.x;
+				by = bestP.y;
+			} else {
+				bx = bestP.points[0][0];
+				by = bestP.points[0][1];
+			}
+
 			return (ax - x) ** 2 + (ay - y) ** 2 < (bx - x) ** 2 + (by - y) ** 2 ? i : best;
 		}, 0);
 
@@ -241,8 +297,13 @@
 				}
 			});
 		} else if (selected.media_type === 'video') {
-			console.error('Video prompt deletion not implemented yet');
-			return;
+			res = await deleteVideoPrompt({
+				client,
+				path: {
+					pid: project.id,
+					aid: (prompts[idx] as VideoPromptRead).id
+				}
+			});
 		} else {
 			console.error('Unsupported media type for deletion:', selected.media_type);
 			return;
@@ -432,22 +493,35 @@
 		drawMasks(ctx);
 
 		prompts.forEach((p) => {
-			const [x, y] = [p.x, p.y];
-			ctx.fillStyle = labels.find((l) => l.id === p.label_id)?.color ?? '#ffffff';
-			const r = 8 / (scale * baseScale);
-			ctx.beginPath();
-			ctx.arc(x, y, r, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.strokeStyle = '#ffffff';
-			ctx.lineWidth = 1 / (scale * baseScale);
-			ctx.beginPath();
-			ctx.moveTo(x - r * 0.6, y);
-			ctx.lineTo(x + r * 0.6, y);
-			if (p.click_label === 1) {
-				ctx.moveTo(x, y - r * 0.6);
-				ctx.lineTo(x, y + r * 0.6);
+			let pts: number[][] = [];
+			let lbls: number[] = [];
+
+			if (isImagePrompt(p)) {
+				pts = [[p.x, p.y]];
+				lbls = [p.click_label];
+			} else {
+				pts = p.points;
+				lbls = p.labels;
 			}
-			ctx.stroke();
+
+			pts.forEach((pt, i) => {
+				const [x, y] = pt;
+				ctx.fillStyle = labels.find((l) => l.id === p.label_id)?.color ?? '#ffffff';
+				const r = 8 / (scale * baseScale);
+				ctx.beginPath();
+				ctx.arc(x, y, r, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.strokeStyle = '#ffffff';
+				ctx.lineWidth = 1 / (scale * baseScale);
+				ctx.beginPath();
+				ctx.moveTo(x - r * 0.6, y);
+				ctx.lineTo(x + r * 0.6, y);
+				if (lbls[i] === 1) {
+					ctx.moveTo(x, y - r * 0.6);
+					ctx.lineTo(x, y + r * 0.6);
+				}
+				ctx.stroke();
+			});
 		});
 	}
 
@@ -471,7 +545,6 @@
 		refreshMedia();
 		refreshModels();
 		refreshLabels();
-		2;
 		eventStream = getEventStream();
 	});
 	onDestroy(() => eventStream?.close());
@@ -484,11 +557,11 @@
 	<ProjectNav
 		content={[
 			{ name: 'Projects', href: '/' },
-			{ name: project.name, href: `/projects/${project.id}` },
+			{ name: project?.name, href: `/projects/${project?.id}` },
 			[
-				{ name: 'Gallery', href: `/projects/${project.id}/gallery` },
-				{ name: 'Studio', href: `/projects/${project.id}/studio`, active: true },
-				{ name: 'Labels', href: `/projects/${project.id}/labels` }
+				{ name: 'Gallery', href: `/projects/${project?.id}/gallery` },
+				{ name: 'Studio', href: `/projects/${project?.id}/studio`, active: true },
+				{ name: 'Labels', href: `/projects/${project?.id}/labels` }
 			]
 		]}
 	/>
@@ -496,17 +569,17 @@
 
 <!-- ───────────────────────────── WORKSPACE LAYOUT ───────────────────────────── -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div class="flex h-[calc(100vh-7rem)] w-full gap-2 select-none">
+<div class="flex h-[calc(100vh-7rem)] w-full select-none gap-2">
 	<!-- LEFT SIDEBAR -->
-	<aside class="w-[270px] shrink-0 rounded-lg border bg-background p-2">
+	<aside class="bg-background w-[270px] shrink-0 rounded-lg border p-2">
 		<ScrollArea class="h-full pr-1">
 			<Collapsible bind:open={showUnannotated}>
 				<CollapsibleTrigger>
 					<Button variant="ghost" class="mb-1 w-full justify-between">
-						<span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+						<span class="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
 							Unannotated
 						</span>
-						<span class="ml-2 text-muted-foreground">{unannotated.length}</span>
+						<span class="text-muted-foreground ml-2">{unannotated.length}</span>
 						<ChevronDown
 							class="h-4 w-4 transition-transform duration-200 {showUnannotated
 								? 'rotate-180'
@@ -536,10 +609,10 @@
 			<Collapsible bind:open={showAnnotated} class="mt-4">
 				<CollapsibleTrigger>
 					<Button variant="ghost" class="mb-1 w-full justify-between">
-						<span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+						<span class="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
 							Annotated
 						</span>
-						<span class="ml-2 text-muted-foreground">{annotated.length}</span>
+						<span class="text-muted-foreground ml-2">{annotated.length}</span>
 						<ChevronDown
 							class="h-4 w-4 transition-transform duration-200 {showAnnotated ? 'rotate-180' : ''}"
 						/>
@@ -588,7 +661,7 @@
 		{#if selected}
 			{#if fileName()}
 				<div
-					class="pointer-events-none absolute top-2 left-2 z-10 rounded bg-black/60 px-2 py-1 text-lg text-white"
+					class="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/60 px-2 py-1 text-lg text-white"
 				>
 					{fileName()}
 					{#if queued.has(selected.id)}
@@ -605,14 +678,17 @@
 					draggable="false"
 					class="absolute inset-0 m-auto h-full w-auto object-contain"
 				/>
-			{:else}
-				<video
-					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}`}
-					controls
-					class="absolute inset-0 m-auto h-full max-h-full w-auto max-w-full object-contain"
-				>
-					<track kind="captions" />
-				</video>
+			{:else if selected.media_type === 'video'}
+				<VideoPlayer
+					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}/frames`}
+					totalFrames={selected.frame_count ?? 100}
+					bind:currentFrameIdx
+					bind:imgElement={imgEl}
+					on:change={() => {
+						refreshPrompts();
+						refreshAnnotations();
+					}}
+				></VideoPlayer>
 			{/if}
 		{/if}
 
@@ -621,7 +697,7 @@
 	</main>
 
 	<!-- RIGHT TOOLBAR -->
-	<aside class="flex w-[270px] shrink-0 flex-col rounded-lg border bg-background p-2">
+	<aside class="bg-background flex w-[270px] shrink-0 flex-col rounded-lg border p-2">
 		<div class="mb-4 flex items-center justify-between gap-1">
 			<Button size="sm" variant="ghost" title="Previous (←)" onclick={prevImage}>(←) Prev</Button>
 			<Button size="sm" variant="ghost" title="Next (→)" onclick={nextImage}>Next (→)</Button>
@@ -638,7 +714,7 @@
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 						<li
-							class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/60"
+							class="hover:bg-muted/60 flex cursor-pointer items-center gap-2 rounded px-2 py-1"
 							onclick={() => (selectedLabelId = l.id)}
 							oncontextmenu={() => (selectedLabelId = l.id)}
 						>
@@ -653,7 +729,7 @@
 		</div>
 
 		<div>
-			<span class="mb-1 block text-sm font-medium text-foreground">Model</span>
+			<span class="text-foreground mb-1 block text-sm font-medium">Model</span>
 
 			<Select type="single" bind:value={selectedModelId}>
 				<SelectTrigger class="w-full" placeholder="Select a model">
@@ -685,19 +761,30 @@
 			<ScrollArea class="flex-1 overflow-y-auto pr-1">
 				<ul class="h-full space-y-1 text-xs">
 					{#each prompts as prompt}
-						<li class="flex items-center justify-between rounded bg-muted/60 px-2 py-1">
+						<li class="bg-muted/60 flex items-center justify-between rounded px-2 py-1">
 							<div
 								class="h-3 w-3 rounded-full"
 								style="background:{labels.find((l) => l.id === prompt.label_id)?.color}"
 							></div>
 							<span class="truncate">
-								{prompt.click_label === 1 ? '+' : '-'} • {prompt.x}, {prompt.y}
+								{#if isImagePrompt(prompt)}
+									{prompt.click_label === 1 ? '+' : '-'} • {prompt.x}, {prompt.y}
+								{:else}
+									{prompt.labels[0] === 1 ? '+' : '-'} • {prompt.points[0][0]}, {prompt
+										.points[0][1]}
+								{/if}
 							</span>
 							<Button
 								variant="ghost"
 								size="icon"
-								class="ml-2 text-muted-foreground hover:text-destructive"
-								onclick={() => deleteNearestPrompt(prompt.x, prompt.y)}
+								class="text-muted-foreground hover:text-destructive ml-2"
+								onclick={() => {
+									if (isImagePrompt(prompt)) {
+										deleteNearestPrompt(prompt.x, prompt.y);
+									} else {
+										deleteNearestPrompt(prompt.points[0][0], prompt.points[0][1]);
+									}
+								}}
 							>
 								&times;
 							</Button>
