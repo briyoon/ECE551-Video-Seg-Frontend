@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-svelte';
-	import { onMount, onDestroy } from 'svelte';
+	import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+
+	const dispatch = createEventDispatcher();
 
 	export let src: string; // Base URL to fetch frames
 	export let totalFrames: number; // For scrubber range
@@ -12,6 +14,8 @@
 	let isPlaying = false;
 	let intervalId: any;
 	let hoverIdx = -1;
+
+	$: dispatch('change', currentFrameIdx);
 
 	function nextFrame() {
 		if (currentFrameIdx < totalFrames - 1) {
@@ -79,6 +83,7 @@
 				src={`${src}/${currentFrameIdx}`}
 				class="pointer-events-none max-h-full max-w-full select-none object-contain"
 				draggable="false"
+				onload={() => dispatch('imgload')}
 			/>
 		{/if}
 		<slot />

@@ -54,6 +54,9 @@
 	let selected: MediaRead | undefined = $state();
 	let queued = $state(new Set<number>());
 
+	let isLoadingVideo = $state(false);
+	let isSubmitting = $state(false);
+
 	let showUnannotated = $state(true);
 	let showAnnotated = $state(true);
 
@@ -63,11 +66,27 @@
 	let labels: LabelRead[] = $state([]);
 	let selectedLabelId: number | undefined = $state(); // active label for new prompts
 
-	let prompts: (ImagePromptRead | VideoPromptRead)[] = $state([]);
+	let prompts: (ImagePromptRead | VideoPromptRead | VideoPromptCreate)[] = $state([]);
 	let annotations: (ImageAnnotationRead | VideoAnnotationRead)[] = $state([]);
 
 	// video specific
 	let currentFrameIdx = $state(0);
+	let videoPromptsCache: VideoPromptRead[] = $state([]);
+	let videoAnnotationsCache: VideoAnnotationRead[] = $state([]);
+	let pendingPrompts: VideoPromptCreate[] = $state([]); // buffered prompts
+	let pendingDeletes: number[] = $state([]); // buffered delete IDs
+
+	function updateVideoView() {
+		if (selected?.media_type !== 'video') return;
+		const cached = videoPromptsCache.filter(
+			(p) => p.frame_idx === currentFrameIdx && !pendingDeletes.includes(p.id)
+		);
+		const pending = pendingPrompts.filter((p) => p.frame_idx === currentFrameIdx);
+		prompts = [...cached, ...pending];
+
+		annotations = videoAnnotationsCache.filter((a) => a.frame_idx === currentFrameIdx);
+		drawOverlay();
+	}
 
 	// viewer transform
 	let scale = 1;
@@ -118,6 +137,7 @@
 
 	async function refreshPrompts() {
 		if (!selected) return;
+		console.log('refreshPrompts', selected.id, currentFrameIdx);
 		if (selected.media_type === 'image') {
 			const { data } = await listImagePrompt({
 				client,
@@ -125,15 +145,16 @@
 				query: { media_id: selected.id }
 			});
 			prompts = data ?? [];
+			drawOverlay();
 		} else {
 			const { data } = await listVideoPrompt({
 				client,
 				path: { pid: project.id },
-				query: { media_id: selected.id, frame_idx: currentFrameIdx }
+				query: { media_id: selected.id } // Fetch ALL
 			});
-			prompts = data ?? [];
+			videoPromptsCache = data ?? [];
+			updateVideoView();
 		}
-		drawOverlay();
 	}
 
 	async function refreshAnnotations() {
@@ -144,15 +165,16 @@
 				path: { pid: project.id, mid: selected.id }
 			});
 			annotations = data ?? [];
+			drawOverlay();
 		} else {
 			const { data } = await getVideoAnnotation({
 				client,
 				path: { pid: project.id, mid: selected.id },
-				query: { frame_idx: currentFrameIdx }
+				query: {} // Fetch ALL
 			});
-			annotations = data ?? [];
+			videoAnnotationsCache = data ?? [];
+			updateVideoView();
 		}
-		drawOverlay();
 	}
 
 	function selectMedia(item: MediaRead) {
@@ -161,6 +183,11 @@
 		offsetX = 0;
 		offsetY = 0;
 		currentFrameIdx = 0; // Reset frame index
+
+		// Reset UI states
+		isLoadingVideo = false;
+		isSubmitting = false;
+
 		refreshPrompts();
 		refreshAnnotations();
 	}
@@ -207,6 +234,10 @@
 
 	async function addPrompt(x: number, y: number, positive = true) {
 		if (!selected) return;
+		if (selectedLabelId === undefined) {
+			toast.error('Please select a label first');
+			return;
+		}
 		pushUndo();
 
 		let res;
@@ -219,42 +250,129 @@
 				click_label: positive ? 1 : 0
 			};
 
-			res = await addImagePrompt({
-				client,
-				body: newPrompt,
-				path: { pid: project.id },
-				query: { model_key: selectedModelId as any }
-			});
+			try {
+				// start spinner early
+				queued.add(Number(selected.id));
+				queued = new Set(queued);
+
+				res = await addImagePrompt({
+					client,
+					body: newPrompt,
+					path: { pid: project.id },
+					query: { model_key: selectedModelId as any }
+				});
+
+				if (!res.response.ok) throw new Error('Failed');
+				// On success, we keep the spinner active until SSE event arrives
+				toast.success('Prompt added');
+			} catch (err) {
+				console.error(err);
+				toast.error('Failed to add prompt');
+				queued.delete(Number(selected.id));
+				queued = new Set(queued);
+			}
 		} else if (selected.media_type === 'video') {
+			let objIdx = 0;
+			// check if we have an existing object for this label
+			// Search in cache AND pending
+			const allPrompts = [...videoPromptsCache, ...pendingPrompts];
+			// Filter by label ID?
+			// Ideally we want to match existing object ID for that label.
+			const match = allPrompts.find((p) => p.label_id === selectedLabelId);
+			if (match) {
+				objIdx = match.obj_idx;
+			} else {
+				// new object
+				if (allPrompts.length > 0) {
+					objIdx = Math.max(...allPrompts.map((p) => p.obj_idx)) + 1;
+				}
+			}
+
 			let newPrompt: VideoPromptCreate = {
 				media_id: selected.id,
 				label_id: selectedLabelId!,
 				frame_idx: currentFrameIdx,
-				obj_idx: 0, // Defaulting to 0 for single object focus or simple test
+				obj_idx: objIdx,
 				points: [[x, y]],
 				labels: [positive ? 1 : 0]
 			};
 
-			res = await addVideoPrompt({
-				client,
-				path: { pid: project.id },
-				body: newPrompt,
-				query: { model_key: selectedModelId as any }
-			});
+			pendingPrompts.push(newPrompt);
+			toast.info('Prompt buffered (Press Enter to Submit)');
+			drawOverlay();
 		} else {
 			console.error('Unsupported media type for prompt:', selected.media_type);
 			return;
 		}
 
-		if (res.response.ok && res.data) {
-			if (res.data.detail === 'queued') queued.add(selected!.id);
-			toast.success('Prompt added');
-		} else {
-			toast.error('Failed to add prompt');
-		}
-
 		refreshPrompts();
 		refreshMedia();
+	}
+
+	async function submitPrompts() {
+		if ((!pendingPrompts.length && !pendingDeletes.length) || !selected) return;
+
+		isSubmitting = true;
+		queued.add(Number(selected.id));
+		queued = new Set(queued);
+
+		try {
+			const payload = {
+				add: pendingPrompts,
+				delete: pendingDeletes
+			};
+
+			const res = await fetch(
+				`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/prompts/video/sync`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				}
+			);
+
+			if (!res.ok) throw new Error('Failed');
+
+			toast.info('Processing updates...');
+
+			pendingPrompts = [];
+			pendingDeletes = [];
+			updateVideoView();
+		} catch (err) {
+			console.error(err);
+			toast.error('Failed to submit updates');
+			queued.delete(Number(selected.id));
+			queued = new Set(queued);
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
+	async function loadVideo() {
+		if (!selected || selected.media_type !== 'video') return;
+
+		isLoadingVideo = true;
+		const id = selected.id;
+		queued.add(id);
+		queued = new Set(queued);
+
+		try {
+			const res = await fetch(
+				`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/prompts/video/load?media_id=${id}&model_key=${encodeURIComponent(selectedModelId)}`,
+				{
+					method: 'POST'
+				}
+			);
+			if (!res.ok) throw new Error('Failed to load video');
+			toast.success('Video loaded into memory');
+		} catch (err) {
+			console.error(err);
+			toast.error('Failed to load video');
+		} finally {
+			queued.delete(id);
+			queued = new Set(queued);
+			isLoadingVideo = false;
+		}
 	}
 
 	async function deleteNearestPrompt(x: number, y: number) {
@@ -287,33 +405,45 @@
 			return (ax - x) ** 2 + (ay - y) ** 2 < (bx - x) ** 2 + (by - y) ** 2 ? i : best;
 		}, 0);
 
-		let res;
-		if (selected.media_type === 'image') {
-			res = await deleteImagePrompt({
-				client,
-				path: {
-					pid: project.id,
-					aid: (prompts[idx] as ImagePromptRead).id
-				}
-			});
-		} else if (selected.media_type === 'video') {
-			res = await deleteVideoPrompt({
-				client,
-				path: {
-					pid: project.id,
-					aid: (prompts[idx] as VideoPromptRead).id
-				}
-			});
-		} else {
-			console.error('Unsupported media type for deletion:', selected.media_type);
-			return;
-		}
+		// start spinner early
 
-		if (res.response.ok && res.data) {
-			if (res.data.detail === 'queued') queued.add(selected!.id);
-			toast.success('Prompt deleted');
-		} else {
+		try {
+			let res;
+			if (selected.media_type === 'image') {
+				queued.add(Number(selected.id));
+				queued = new Set(queued);
+				res = await deleteImagePrompt({
+					client,
+					path: {
+						pid: project.id,
+						aid: (prompts[idx] as ImagePromptRead).id
+					}
+				});
+				if (res && !res.response.ok) throw new Error('Failed');
+				// On success, we keep the spinner active until SSE event arrives
+				toast.success('Prompt deleted');
+			} else if (selected.media_type === 'video') {
+				const p = prompts[idx];
+				if ('id' in p) {
+					// Server key
+					pendingDeletes.push(p.id);
+					toast.info('Deletion buffered');
+				} else {
+					// Local key (pending prompt)
+					pendingPrompts = pendingPrompts.filter((item) => item !== p);
+					toast.info('Buffered prompt removed');
+				}
+				updateVideoView();
+			} else {
+				throw new Error('Unsupported media type');
+			}
+		} catch (err) {
+			console.error(err);
 			toast.error('Failed to delete prompt');
+			if (selected.media_type === 'image') {
+				queued.delete(Number(selected.id));
+				queued = new Set(queued);
+			}
 		}
 
 		refreshPrompts();
@@ -386,6 +516,11 @@
 		}
 		if (e.ctrlKey && e.key === 'y') {
 			redo();
+			return;
+		}
+
+		if (e.key === 'Enter') {
+			submitPrompts();
 			return;
 		}
 	}
@@ -523,6 +658,35 @@
 				ctx.stroke();
 			});
 		});
+
+		// draw pending
+		pendingPrompts.forEach((p) => {
+			if (p.frame_idx !== currentFrameIdx) return;
+			const pt = p.points[0];
+			const [x, y] = pt;
+
+			ctx.fillStyle = labels.find((l) => l.id === p.label_id)?.color ?? '#ffffff';
+			const r = 8 / (scale * baseScale);
+
+			// Dashed stroke for pending
+			ctx.save();
+			ctx.setLineDash([2, 2]);
+
+			ctx.beginPath();
+			ctx.arc(x, y, r, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.strokeStyle = '#ffff00'; // Yellow stroke for pending
+			ctx.lineWidth = 2 / (scale * baseScale);
+			ctx.beginPath();
+			ctx.moveTo(x - r * 0.6, y);
+			ctx.lineTo(x + r * 0.6, y);
+			if (p.labels[0] === 1) {
+				ctx.moveTo(x, y - r * 0.6);
+				ctx.lineTo(x, y + r * 0.6);
+			}
+			ctx.stroke();
+			ctx.restore();
+		});
 	}
 
 	function getEventStream() {
@@ -531,11 +695,14 @@
 			const msg = JSON.parse(evt.data);
 			if (msg.event === 'annotations_updated') {
 				queued.delete(msg.media_id);
+				queued = new Set(queued);
 				if (selected && selected.id === msg.media_id) {
 					refreshPrompts();
 					refreshAnnotations();
 				}
 				refreshMedia();
+			} else if (msg.event === 'video_progress') {
+				// optional: could use toast to show background progress if needed
 			}
 		};
 		return es;
@@ -590,7 +757,7 @@
 
 				<CollapsibleContent>
 					<ul class="space-y-1">
-						{#each unannotated as item}
+						{#each unannotated as item (item.id)}
 							<li>
 								<Button
 									variant={selected?.id === item.id ? 'secondary' : 'ghost'}
@@ -621,7 +788,7 @@
 
 				<CollapsibleContent>
 					<ul class="space-y-1">
-						{#each annotated as item}
+						{#each annotated as item (item.id)}
 							<li>
 								<Button
 									variant={selected?.id === item.id ? 'secondary' : 'ghost'}
@@ -684,10 +851,8 @@
 					totalFrames={selected.frame_count ?? 100}
 					bind:currentFrameIdx
 					bind:imgElement={imgEl}
-					on:change={() => {
-						refreshPrompts();
-						refreshAnnotations();
-					}}
+					on:change={updateVideoView}
+					on:imgload={handleImgLoad}
 				></VideoPlayer>
 			{/if}
 		{/if}
@@ -698,12 +863,39 @@
 
 	<!-- RIGHT TOOLBAR -->
 	<aside class="bg-background flex w-[270px] shrink-0 flex-col rounded-lg border p-2">
-		<div class="mb-4 flex items-center justify-between gap-1">
-			<Button size="sm" variant="ghost" title="Previous (←)" onclick={prevImage}>(←) Prev</Button>
-			<Button size="sm" variant="ghost" title="Next (→)" onclick={nextImage}>Next (→)</Button>
-			<Button size="sm" variant="outline" title="Next unannotated (U)" onclick={nextUnannotated}>
-				Next (U)
-			</Button>
+		<div class="mb-4 flex flex-col gap-2 border-b pb-4">
+			<div class="flex items-center justify-between gap-1">
+				<Button size="sm" variant="ghost" title="Previous (←)" onclick={prevImage}>(←) Prev</Button>
+				<Button size="sm" variant="ghost" title="Next (→)" onclick={nextImage}>Next (→)</Button>
+				<Button size="sm" variant="outline" title="Next unannotated (U)" onclick={nextUnannotated}>
+					Next (U)
+				</Button>
+			</div>
+
+			<div class="grid grid-cols-2 gap-2">
+				<Button
+					size="sm"
+					variant="secondary"
+					disabled={selected?.media_type !== 'video' || isLoadingVideo}
+					onclick={loadVideo}
+				>
+					{isLoadingVideo ? 'Loading...' : 'Load Video'}
+				</Button>
+
+				<Button
+					size="sm"
+					variant={pendingPrompts.length > 0 || pendingDeletes.length > 0 ? 'default' : 'outline'}
+					class={pendingPrompts.length > 0 || pendingDeletes.length > 0
+						? 'animate-pulse bg-yellow-600 text-white'
+						: ''}
+					disabled={(pendingPrompts.length === 0 && pendingDeletes.length === 0) || isSubmitting}
+					onclick={submitPrompts}
+				>
+					{isSubmitting
+						? 'Submitting...'
+						: `Submit (${pendingPrompts.length + pendingDeletes.length})`}
+				</Button>
+			</div>
 		</div>
 
 		<div class="mb-4">
