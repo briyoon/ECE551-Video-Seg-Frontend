@@ -56,6 +56,7 @@
 
 	let isLoadingVideo = $state(false);
 	let isSubmitting = $state(false);
+	let isPlaying = $state(false);
 
 	let showUnannotated = $state(true);
 	let showAnnotated = $state(true);
@@ -75,6 +76,7 @@
 	let videoAnnotationsCache: VideoAnnotationRead[] = $state([]);
 	let pendingPrompts: VideoPromptCreate[] = $state([]); // buffered prompts
 	let pendingDeletes: number[] = $state([]); // buffered delete IDs
+	let annotationVersion = $state(Date.now()); // cache buster for SSR frames
 
 	function updateVideoView() {
 		if (selected?.media_type !== 'video') return;
@@ -216,13 +218,18 @@
 			imgRect.width / imgW, // scale chosen when width is the limiting side
 			imgRect.height / imgH // scale chosen when height is the limiting side
 		);
+		const targetW = imgW * baseScale;
+		const targetH = imgH * baseScale;
+		const ox = (imgRect.width - targetW) / 2;
+		const oy = (imgRect.height - targetH) / 2;
+
 		/* mouse position in viewer space */
 		const mx = e.clientX - mainRect.left;
 		const my = e.clientY - mainRect.top;
 
-		/* remove viewer pan & the img’s offset inside <main> */
-		const vx = mx - offsetX - (imgRect.left - mainRect.left);
-		const vy = my - offsetY - (imgRect.top - mainRect.top);
+		/* remove viewer pan & the img’s offset & centering offset */
+		const vx = mx - offsetX - (imgRect.left - mainRect.left) - ox;
+		const vy = my - offsetY - (imgRect.top - mainRect.top) - oy;
 
 		/* reverse zoom & object‑contain, then round */
 		const x = Math.round(vx / (scale * baseScale));
@@ -323,7 +330,9 @@
 			};
 
 			const res = await fetch(
-				`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/prompts/video/sync`,
+				`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/prompts/video/sync?model_key=${encodeURIComponent(
+					selectedModelId!
+				)}`,
 				{
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -596,36 +605,10 @@
 		ctx.drawImage(temp, 0, 0);
 	}
 
-	function drawOverlay() {
-		const ctx = annCanvas?.getContext('2d');
-		if (!ctx || !selected || !imgEl) return;
-
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-		const dpr = window.devicePixelRatio || 1;
-
-		const dispW = viewerEl.clientWidth;
-		const dispH = viewerEl.clientHeight;
-
-		annCanvas.style.width = `${dispW}px`;
-		annCanvas.style.height = `${dispH}px`;
-		annCanvas.width = dispW * dpr;
-		annCanvas.height = dispH * dpr;
-
-		ctx.scale(dpr, dpr);
-		ctx.clearRect(0, 0, dispW, dispH);
-
-		const mainRect = annCanvas.getBoundingClientRect();
-		const imgRect = imgEl.getBoundingClientRect();
-		const baseScale = Math.min(
-			imgRect.width / imgW, // scale chosen when width is the limiting side
-			imgRect.height / imgH // scale chosen when height is the limiting side
-		);
-
-		ctx.translate(offsetX + (imgRect.left - mainRect.left), offsetY + (imgRect.top - mainRect.top));
-		ctx.scale(scale * baseScale, scale * baseScale);
-
-		drawMasks(ctx);
+	function drawPrompts(ctx: CanvasRenderingContext2D) {
+		const mainRect = annCanvas!.getBoundingClientRect();
+		const imgRect = imgEl!.getBoundingClientRect();
+		const baseScale = Math.min(imgRect.width / imgW, imgRect.height / imgH);
 
 		prompts.forEach((p) => {
 			let pts: number[][] = [];
@@ -689,6 +672,48 @@
 		});
 	}
 
+	function drawOverlay() {
+		const ctx = annCanvas?.getContext('2d');
+		if (!ctx || !selected || !imgEl) return;
+
+		const dpr = window.devicePixelRatio || 1;
+
+		const dispW = viewerEl.clientWidth;
+		const dispH = viewerEl.clientHeight;
+
+		annCanvas.style.width = `${dispW}px`;
+		annCanvas.style.height = `${dispH}px`;
+		annCanvas.width = dispW * dpr;
+		annCanvas.height = dispH * dpr;
+
+		ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+		ctx.clearRect(0, 0, annCanvas.width, annCanvas.height);
+
+		const mainRect = annCanvas.getBoundingClientRect();
+		const imgRect = imgEl.getBoundingClientRect();
+
+		ctx.scale(scale * dpr, scale * dpr);
+		ctx.translate(offsetX, offsetY);
+		ctx.translate(imgRect.left - mainRect.left, imgRect.top - mainRect.top);
+
+		const baseScale = Math.min(imgRect.width / imgW, imgRect.height / imgH);
+		const targetW = imgW * baseScale;
+		const targetH = imgH * baseScale;
+		const ox = (imgRect.width - targetW) / 2;
+		const oy = (imgRect.height - targetH) / 2;
+
+		ctx.scale(baseScale, baseScale);
+		ctx.translate(ox / baseScale, oy / baseScale);
+
+		// Only draw masks client-side for images.
+		// For video, we use Server-Side Rendering (SSR) via the frame URL.
+		if (selected.media_type === 'image') {
+			drawMasks(ctx);
+		}
+
+		drawPrompts(ctx);
+	}
+
 	function getEventStream() {
 		const es = new EventSource(`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/events`);
 		es.onmessage = (evt) => {
@@ -698,7 +723,7 @@
 				queued = new Set(queued);
 				if (selected && selected.id === msg.media_id) {
 					refreshPrompts();
-					refreshAnnotations();
+					annotationVersion = Date.now();
 				}
 				refreshMedia();
 			} else if (msg.event === 'video_progress') {
@@ -717,7 +742,7 @@
 	onDestroy(() => eventStream?.close());
 </script>
 
-<svelte:window onkeydown={handleKey} onresize={drawOverlay} />
+<svelte:window onkeydown={handleKeydown} onresize={drawOverlay} />
 
 <!-- Header -->
 <div class="mb-6">
@@ -848,8 +873,10 @@
 			{:else if selected.media_type === 'video'}
 				<VideoPlayer
 					src={`${PUBLIC_API_BASE}/api/v1/projects/${project.id}/media/${selected.id}/frames`}
+					urlSuffix={`/annotated?t=${annotationVersion}`}
 					totalFrames={selected.frame_count ?? 100}
 					bind:currentFrameIdx
+					bind:isPlaying
 					bind:imgElement={imgEl}
 					on:change={updateVideoView}
 					on:imgload={handleImgLoad}
