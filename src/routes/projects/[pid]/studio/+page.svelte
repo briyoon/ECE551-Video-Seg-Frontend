@@ -499,7 +499,7 @@
 	}
 
 	/* ──────────────────────── keyboard shortcuts ─────────────────────── */
-	function handleKey(e: KeyboardEvent) {
+	function handleKeydown(e: KeyboardEvent) {
 		const n = parseInt(e.key);
 		if (!isNaN(n) && n >= 1 && n <= labels.length) {
 			selectedLabelId = labels[n - 1].id;

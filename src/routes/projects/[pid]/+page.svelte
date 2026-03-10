@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { LoaderCircle } from '@lucide/svelte';
 	import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { getContext } from 'svelte';
@@ -14,6 +15,7 @@
 	import ProjectNav from '$lib/components/ProjectNav.svelte';
 
 	const project = getContext<ProjectRead>('project');
+	let isExporting = $state(false);
 
 	const deleteProject = async () => {
 		if (
@@ -35,6 +37,7 @@
 	};
 
 	const exportProject = async () => {
+		isExporting = true;
 		try {
 			const { data, response } = await apiExportProject({
 				client,
@@ -59,6 +62,8 @@
 		} catch (err) {
 			console.error(err);
 			toast.error('Failed to export annotations. Please try again later.');
+		} finally {
+			isExporting = false;
 		}
 	};
 </script>
@@ -97,7 +102,14 @@
 	<Card>
 		<CardHeader><CardTitle>Export Annotations</CardTitle></CardHeader>
 		<CardContent>
-			<Button variant="secondary" onclick={exportProject}>Download JSON</Button>
+			<Button variant="secondary" onclick={exportProject} disabled={isExporting}>
+				{#if isExporting}
+					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+					Exporting...
+				{:else}
+					Download JSON
+				{/if}
+			</Button>
 		</CardContent>
 	</Card>
 
